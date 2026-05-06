@@ -24,8 +24,7 @@ export const ParameterPanel: Component = () => {
                 <td>
                   <input
                     type="number"
-                    class="num-input"
-                    style="width: 80px"
+                    class="num-input input-md"
                     value={p.value}
                     disabled={state.isRunning}
                     onInput={(e) => setParameter(i(), 'value', parseFloat(e.currentTarget.value))}
@@ -42,8 +41,7 @@ export const ParameterPanel: Component = () => {
                 <td>
                   <input
                     type="number"
-                    class="num-input"
-                    style="width: 80px"
+                    class="num-input input-md"
                     value={p.min}
                     disabled={state.isRunning}
                     onInput={(e) => setParameter(i(), 'min', parseFloat(e.currentTarget.value))}
@@ -52,8 +50,7 @@ export const ParameterPanel: Component = () => {
                 <td>
                   <input
                     type="number"
-                    class="num-input"
-                    style="width: 80px"
+                    class="num-input input-md"
                     value={p.max}
                     disabled={state.isRunning}
                     onInput={(e) => setParameter(i(), 'max', parseFloat(e.currentTarget.value))}

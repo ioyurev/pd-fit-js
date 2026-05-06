@@ -67,7 +67,7 @@ export const ResidualsPlot: Component = () => {
   };
 
   return (
-    <div class="residuals-plot" style="height: 250px; width: 100%; margin-top: 20px;">
+    <div class="chart-container residual-chart">
       <Scatter data={chartData()} options={options} />
     </div>
   );

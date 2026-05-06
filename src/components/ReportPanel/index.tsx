@@ -16,7 +16,6 @@ export const ReportPanel: Component = () => {
     const freeParams = parameters.filter(p => !p.fixed);
     
     freeParams.forEach((p, i) => {
-      // Error is sqrt of diagonal element of covariance matrix
       const variance = covMatrix[i][i];
       errors[p.name] = variance > 0 ? Math.sqrt(variance) : 0;
     });
@@ -43,7 +42,7 @@ export const ReportPanel: Component = () => {
                 <td>{p.value.toFixed(4)}</td>
                 <td>
                   {p.fixed 
-                    ? <span style="color: #999;">фикс.</span> 
+                    ? <span class="text-muted">фикс.</span> 
                     : (paramErrors()[p.name] !== undefined ? paramErrors()[p.name].toFixed(4) : '—')}
                 </td>
               </tr>
@@ -54,7 +53,7 @@ export const ReportPanel: Component = () => {
 
       <button 
         onClick={shareURL}
-        class="btn-share"
+        class="btn-share mt-3"
         disabled={state.isRunning}
       >
         Поделиться (копировать URL)

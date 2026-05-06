@@ -108,7 +108,7 @@ export const DiagramPlot: Component = () => {
   };
 
   return (
-    <div class="diagram-plot" style="height: 400px; width: 100%;">
+    <div class="chart-container main-chart">
       <Scatter data={chartData()} options={options} />
     </div>
   );

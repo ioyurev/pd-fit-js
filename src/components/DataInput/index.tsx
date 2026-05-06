@@ -24,8 +24,7 @@ export const DataInput: Component = () => {
                   <input
                     type="number"
                     step="0.01"
-                    class="num-input"
-                    style="width: 60px"
+                    class="num-input input-sm"
                     value={p.xA}
                     disabled={state.isRunning}
                     onInput={(e) => updateDataPoint(i(), 'xA', parseFloat(e.currentTarget.value))}
@@ -35,8 +34,7 @@ export const DataInput: Component = () => {
                   <input
                     type="number"
                     step="1"
-                    class="num-input"
-                    style="width: 80px"
+                    class="num-input input-md"
                     value={p.T}
                     disabled={state.isRunning}
                     onInput={(e) => updateDataPoint(i(), 'T', parseFloat(e.currentTarget.value))}
@@ -46,8 +44,7 @@ export const DataInput: Component = () => {
                   <input
                     type="number"
                     step="0.1"
-                    class="num-input"
-                    style="width: 50px"
+                    class="num-input input-xs"
                     value={p.sigma}
                     disabled={state.isRunning}
                     onInput={(e) => updateDataPoint(i(), 'sigma', parseFloat(e.currentTarget.value))}
@@ -57,8 +54,8 @@ export const DataInput: Component = () => {
                   <select 
                     value={p.branch} 
                     disabled={state.isRunning}
+                    class="select-sm"
                     onChange={(e) => updateDataPoint(i(), 'branch', e.currentTarget.value)}
-                    style="font-size: 0.8rem;"
                   >
                     <option value="A">Ветвь A</option>
                     <option value="B">Ветвь B</option>
@@ -79,8 +76,7 @@ export const DataInput: Component = () => {
       </table>
       <button 
         onClick={addDataPoint}
-        class="btn-primary"
-        style="margin-top: 10px;"
+        class="btn-primary mt-3"
         disabled={state.isRunning}
       >Добавить точку</button>
     </div>
