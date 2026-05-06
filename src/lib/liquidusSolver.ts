@@ -2,7 +2,8 @@ import { liquidusResidualA, liquidusResidualB } from './thermodynamics';
 import type { PureComponent } from './thermodynamics';
 import { lnGammaA, lnGammaB } from './redlichKister';
 
-export type Branch = 'A' | 'B';
+// Ветвь может быть 'A', 'B', 'eutectic' или 'Ttrans_A_0', 'Ttrans_B_1' и т.д.
+export type Branch = string;
 
 // Simple Brent's method implementation
 function brent(f: (x: number) => number, lower: number, upper: number, tolerance: number): number {
@@ -12,7 +13,6 @@ function brent(f: (x: number) => number, lower: number, upper: number, tolerance
   let fb = f(b);
   
   if (fa * fb >= 0) {
-    // If signs don't alternate, expand the search window by checking closer to boundaries or just bisection fallback
     if (Math.abs(fa) < Math.abs(fb)) return a;
     return b;
   }
@@ -35,16 +35,13 @@ function brent(f: (x: number) => number, lower: number, upper: number, tolerance
     }
     
     if (fa !== fc && fb !== fc) {
-      // Inverse quadratic interpolation
       s = a * fb * fc / ((fa - fb) * (fa - fc)) +
           b * fa * fc / ((fb - fa) * (fb - fc)) +
           c * fa * fb / ((fc - fa) * (fc - fb));
     } else {
-      // Secant method
       s = b - fb * (b - a) / (fb - fa);
     }
     
-    // Check condition to use bisection
     const condition1 = (s < (3 * a + b) / 4 || s > b) && (s > (3 * a + b) / 4 || s < b);
     const condition2 = mflag && Math.abs(s - b) >= Math.abs(b - c) / 2;
     const condition3 = !mflag && Math.abs(s - b) >= Math.abs(c - d) / 2;
@@ -90,6 +87,16 @@ export function calcTLiquidus(
   Tmin = 200,
   Tmax = 3000,
 ): number {
+  // Обработка точек полиморфных переходов напрямую (горизонтальная линия)
+  if (branch.startsWith('Ttrans_A_')) {
+    const t = compA.transitions.find(trans => trans.id === branch);
+    return t ? t.T : 0;
+  }
+  if (branch.startsWith('Ttrans_B_')) {
+    const t = compB.transitions.find(trans => trans.id === branch);
+    return t ? t.T : 0;
+  }
+
   const f = (T: number) => {
     const Lv = Lv_H.map((H, i) => H - T * Lv_S[i]);
     const gammaA = Math.exp(lnGammaA(xA, T, Lv));

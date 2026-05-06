@@ -1,8 +1,12 @@
-import { For } from 'solid-js';
+import { For, createMemo } from 'solid-js';
 import type { Component } from 'solid-js';
 import { state, addDataPoint, removeDataPoint, updateDataPoint } from '../../store/fitStore';
 
 export const DataInput: Component = () => {
+  // Динамически получаем существующие переходы для выпадающего списка
+  const transABranches = createMemo(() => state.parameters.filter(p => p.name.startsWith('Ttrans_A_')).map(p => p.name));
+  const transBBranches = createMemo(() => state.parameters.filter(p => p.name.startsWith('Ttrans_B_')).map(p => p.name));
+
   return (
     <div class="data-input">
       <h3>Экспериментальные данные</h3>
@@ -60,6 +64,12 @@ export const DataInput: Component = () => {
                     <option value="A">Ветвь A</option>
                     <option value="B">Ветвь B</option>
                     <option value="eutectic">Эвтектика</option>
+                    <For each={transABranches()}>
+                      {(name) => <option value={name}>Переход A ({name.split('_')[2]})</option>}
+                    </For>
+                    <For each={transBBranches()}>
+                      {(name) => <option value={name}>Переход B ({name.split('_')[2]})</option>}
+                    </For>
                   </select>
                 </td>
                 <td>

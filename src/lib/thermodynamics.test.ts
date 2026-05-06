@@ -3,7 +3,7 @@ import { R, schroederRHS, liquidusResidualA } from './thermodynamics';
 
 describe('Thermodynamics Core', () => {
   it('calculates Schroeder-Le Chatelier RHS correctly', () => {
-    const comp = { Tfus: 1000, dHfus: 10000 };
+    const comp = { Tfus: 1000, dHfus: 10000, transitions: [] };
     const T = 800;
     // (10000 / 8.314) * (1/1000 - 1/800) = 1202.79... * (0.001 - 0.00125) = 1202.79 * -0.00025 = -0.30069
     const expected = (comp.dHfus / R) * (1 / comp.Tfus - 1 / T);
@@ -11,7 +11,7 @@ describe('Thermodynamics Core', () => {
   });
 
   it('calculates ideal liquidus residual correctly', () => {
-    const comp = { Tfus: 1000, dHfus: 10000 };
+    const comp = { Tfus: 1000, dHfus: 10000, transitions: [] };
     const xA = 0.8;
     const gammaA = 1.0; // Ideal solution
     const T = 900;

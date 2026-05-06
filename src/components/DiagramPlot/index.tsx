@@ -61,34 +61,67 @@ export const DiagramPlot: Component = () => {
        curveA.push({ x: 1, y: calcTLiquidus(1, 'A', compA, compB, Lv_H, Lv_S) });
     }
 
-    return {
-      datasets: [
-        {
-          label: 'Эксперимент',
-          data: expPoints,
-          backgroundColor: 'rgba(255, 99, 132, 1)',
-          type: 'scatter' as const,
-        },
-        {
-          label: 'Ликвидус A',
-          data: curveA,
-          borderColor: 'rgba(54, 162, 235, 1)',
-          borderWidth: 2,
-          pointRadius: 0,
-          fill: false,
-          type: 'line' as const,
-        },
-        {
-          label: 'Ликвидус B',
-          data: curveB,
-          borderColor: 'rgba(75, 192, 192, 1)',
-          borderWidth: 2,
-          pointRadius: 0,
-          fill: false,
-          type: 'line' as const,
-        }
-      ]
-    };
+    // --- НОВАЯ ЛОГИКА: ЛИНИИ ПЕРЕХОДОВ ---
+    const datasets: any[] = [
+      {
+        label: 'Эксперимент',
+        data: expPoints,
+        backgroundColor: 'rgba(255, 99, 132, 1)',
+        type: 'scatter' as const,
+      },
+      {
+        label: 'Ликвидус A',
+        data: curveA,
+        borderColor: 'rgba(54, 162, 235, 1)',
+        borderWidth: 2,
+        pointRadius: 0,
+        fill: false,
+        type: 'line' as const,
+      },
+      {
+        label: 'Ликвидус B',
+        data: curveB,
+        borderColor: 'rgba(75, 192, 192, 1)',
+        borderWidth: 2,
+        pointRadius: 0,
+        fill: false,
+        type: 'line' as const,
+      }
+    ];
+
+    // Отрисовка линий всех переходов для B (слева направо до пересечения с ликвидусом)
+    for (const trans of compB.transitions) {
+      if (trans.T <= 0) continue;
+      // Ищем пересечение: первая точка слева направо, где температура падает ниже Ttrans
+      const intersectPoint = curveB.find(p => p.y <= trans.T) || { x: ex, y: trans.T };
+      datasets.push({
+        label: `Переход B (${trans.T.toFixed(0)} K)`,
+        data: [{ x: 0, y: trans.T }, { x: intersectPoint.x, y: trans.T }],
+        borderColor: 'rgba(75, 192, 192, 0.6)',
+        borderWidth: 1.5,
+        borderDash: [5, 5],
+        pointRadius: 0,
+        type: 'line' as const,
+      });
+    }
+
+    // Отрисовка линий всех переходов для A (от пересечения с ликвидусом вправо до чистого компонента)
+    for (const trans of compA.transitions) {
+      if (trans.T <= 0) continue;
+      // Ищем пересечение: первая точка слева направо (от эвтектики к краю), где температура поднимается выше Ttrans
+      const intersectPoint = curveA.find(p => p.y >= trans.T) || { x: ex, y: trans.T };
+      datasets.push({
+        label: `Переход A (${trans.T.toFixed(0)} K)`,
+        data: [{ x: intersectPoint.x, y: trans.T }, { x: 1, y: trans.T }],
+        borderColor: 'rgba(54, 162, 235, 0.6)',
+        borderWidth: 1.5,
+        borderDash: [5, 5],
+        pointRadius: 0,
+        type: 'line' as const,
+      });
+    }
+
+    return { datasets };
   });
 
   const options = {

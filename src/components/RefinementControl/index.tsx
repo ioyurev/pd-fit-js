@@ -1,6 +1,5 @@
-import { For } from 'solid-js';
 import type { Component } from 'solid-js';
-import { state, runRefinement, applyStrategy } from '../../store/fitStore';
+import { state, runRefinement, applyStrategy, toggleLog } from '../../store/fitStore';
 
 export const RefinementControl: Component = () => {
   return (
@@ -19,14 +18,13 @@ export const RefinementControl: Component = () => {
         {state.isRunning ? 'Выполняется...' : 'Запустить уточнение'}
       </button>
       
-      <div class="log">
-        <h4>Лог</h4>
-        <pre>
-          <For each={state.log}>
-            {(msg) => <div>{msg}</div>}
-          </For>
-        </pre>
-      </div>
+      <button 
+        class="btn-primary mt-3" 
+        onClick={toggleLog}
+        style="width: 100%; background-color: #7f8c8d;"
+      >
+        Показать лог ({state.log.length} записей)
+      </button>
     </div>
   );
 };

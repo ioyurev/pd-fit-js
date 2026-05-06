@@ -1,4 +1,4 @@
-import { createStore, produce } from 'solid-js/store';
+import { createStore, produce, unwrap } from 'solid-js/store';
 import { paramsToPhysical } from '../lib/fitAdapter';
 import type { FitParameter, FitPoint } from '../lib/fitAdapter';
 import { calcAllTLiquidus } from '../lib/liquidusSolver';
@@ -15,7 +15,7 @@ export interface DataPoint {
   T: number;
   weight: number;
   sigma: number;
-  branch: 'A' | 'B' | 'eutectic';
+  branch: string;
 }
 
 interface FitState {
@@ -30,19 +30,34 @@ interface FitState {
   corrWarnings: string[];
   isRunning: boolean;
   log: string[];
+  isLogOpen: boolean;
 }
 
 // ---------- начальные параметры ----------
 const defaultParams: FitParameter[] = [
-  { name: 'Tfus_A',  value: 1000, fixed: true,  min: 800,  max: 1200 },
-  { name: 'dHfus_A', value: 10000, fixed: true, min: 1000, max: 50000 },
-  { name: 'Tfus_B',  value: 900,  fixed: true,  min: 700,  max: 1100 },
-  { name: 'dHfus_B', value: 8000, fixed: true,  min: 1000, max: 50000 },
-  { name: 'L0_H',    value: 0,    fixed: false, min: -100000, max: 100000 },
-  { name: 'L0_S',    value: 0,    fixed: false, min: -200,    max: 200 },
+  { name: 'Tfus_A',    value: 1000,  fixed: true,  min: 800,  max: 1200 },
+  { name: 'dHfus_A',   value: 10000, fixed: true,  min: 1000, max: 50000 },
+  { name: 'Tfus_B',    value: 900,   fixed: true,  min: 700,  max: 1100 },
+  { name: 'dHfus_B',   value: 8000,  fixed: true,  min: 1000, max: 50000 },
+  { name: 'L0_H',      value: 0,     fixed: false, min: -100000, max: 100000 },
+  { name: 'L0_S',      value: 0,     fixed: false, min: -200,    max: 200 },
 ];
 
 const savedState = loadFromURL();
+
+// Миграция для старых ссылок, если в них были "Ttrans_A" без суффикса
+if (savedState?.parameters) {
+  savedState.parameters.forEach((p: FitParameter) => {
+    if (p.name === 'Ttrans_A') p.name = 'Ttrans_A_0';
+    if (p.name === 'dHtrans_A') p.name = 'dHtrans_A_0';
+    if (p.name === 'Ttrans_B') p.name = 'Ttrans_B_0';
+    if (p.name === 'dHtrans_B') p.name = 'dHtrans_B_0';
+  });
+  savedState.dataPoints.forEach((p: DataPoint) => {
+    if (p.branch === 'trans_A') p.branch = 'Ttrans_A_0';
+    if (p.branch === 'trans_B') p.branch = 'Ttrans_B_0';
+  });
+}
 
 const [state, setState] = createStore<FitState>({
   dataPoints: savedState?.dataPoints || [],
@@ -56,6 +71,7 @@ const [state, setState] = createStore<FitState>({
   corrWarnings: [],
   isRunning: false,
   log: [],
+  isLogOpen: false,
 });
 
 // Авто-синхронизация с URL при изменении данных или параметров
@@ -110,6 +126,27 @@ export function removeRKTerm() {
   setState('parameters', p => p.filter(x => x.name !== `L${lastIndex}_H` && x.name !== `L${lastIndex}_S`));
 }
 
+export function addTransition(comp: 'A'|'B') {
+  setState('parameters', p => {
+    const transParams = p.filter(x => x.name.startsWith(`Ttrans_${comp}_`));
+    const nextId = transParams.length;
+    return [
+      ...p,
+      { name: `Ttrans_${comp}_${nextId}`, value: 800, fixed: true, min: 0, max: 3000 },
+      { name: `dHtrans_${comp}_${nextId}`, value: 2000, fixed: true, min: 0, max: 20000 },
+    ];
+  });
+}
+
+export function removeTransition(comp: 'A'|'B') {
+  setState('parameters', p => {
+    const transParams = p.filter(x => x.name.startsWith(`Ttrans_${comp}_`));
+    if (transParams.length === 0) return p;
+    const lastId = transParams.length - 1;
+    return p.filter(x => x.name !== `Ttrans_${comp}_${lastId}` && x.name !== `dHtrans_${comp}_${lastId}`);
+  });
+}
+
 export function applyStrategy(strategy: 'rk-only' | 'rk-tfus' | 'rk-tfus-dhfus' | 'full') {
   setState('parameters', produce(params => {
     for (const p of params) {
@@ -143,6 +180,10 @@ export function recalculate() {
   });
 }
 
+export function toggleLog() {
+  setState('isLogOpen', v => !v);
+}
+
 export async function runRefinement() {
   setState({ isRunning: true });
   addLog('Запуск уточнения в фоне...');
@@ -158,9 +199,13 @@ export async function runRefinement() {
       }
     }
 
-    const pts = state.dataPoints.filter(p => p.branch !== 'eutectic') as unknown as FitPoint[];
+    // Используем unwrap, чтобы снять Proxy-обертки SolidJS перед отправкой в Worker
+    const rawDataPoints = unwrap(state.dataPoints);
+    const rawParameters = unwrap(state.parameters);
+
+    const pts = rawDataPoints.filter(p => p.branch !== 'eutectic') as unknown as FitPoint[];
     
-    const freeParamsCount = state.parameters.filter(p => !p.fixed).length;
+    const freeParamsCount = rawParameters.filter(p => !p.fixed).length;
     if (freeParamsCount >= pts.length) {
       throw new Error(`Количество свободных параметров (${freeParamsCount}) должно быть меньше количества точек (${pts.length}). Degrees of freedom > 0.`);
     }
@@ -180,7 +225,7 @@ export async function runRefinement() {
         reject(new Error('Worker error: ' + e.message));
         worker.terminate();
       };
-      worker.postMessage({ points: pts, parameters: JSON.parse(JSON.stringify(state.parameters)) });
+      worker.postMessage({ points: pts, parameters: rawParameters });
     });
 
     const { params: finalParams, covarianceMatrix } = workerResult;

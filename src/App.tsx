@@ -7,6 +7,7 @@ import { ResidualsPlot } from './components/ResidualsPlot';
 import { RefinementControl } from './components/RefinementControl';
 import { StatisticsPanel } from './components/StatisticsPanel';
 import { ReportPanel } from './components/ReportPanel';
+import { LogModal } from './components/LogModal';
 import { state } from './store/fitStore';
 import './App.css';
 
@@ -47,6 +48,7 @@ const App: Component = () => {
           </section>
         </div>
       </main>
+      <LogModal />
     </div>
   );
 };

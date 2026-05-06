@@ -1,6 +1,6 @@
 import { For } from 'solid-js';
 import type { Component } from 'solid-js';
-import { state, setParameter, addRKTerm, removeRKTerm } from '../../store/fitStore';
+import { state, setParameter, addRKTerm, removeRKTerm, addTransition, removeTransition } from '../../store/fitStore';
 
 export const ParameterPanel: Component = () => {
   return (
@@ -64,6 +64,12 @@ export const ParameterPanel: Component = () => {
       <div class="actions">
         <button class="btn-primary" onClick={addRKTerm} disabled={state.isRunning}>Добавить пару L_v (H, S)</button>
         <button class="btn-primary" onClick={removeRKTerm} disabled={state.isRunning}>Удалить пару L_v (H, S)</button>
+      </div>
+      <div class="actions mt-3">
+        <button class="btn-primary" onClick={() => addTransition('A')} disabled={state.isRunning}>+ Переход A</button>
+        <button class="btn-primary" onClick={() => removeTransition('A')} disabled={state.isRunning}>- Переход A</button>
+        <button class="btn-primary" onClick={() => addTransition('B')} disabled={state.isRunning}>+ Переход B</button>
+        <button class="btn-primary" onClick={() => removeTransition('B')} disabled={state.isRunning}>- Переход B</button>
       </div>
     </div>
   );

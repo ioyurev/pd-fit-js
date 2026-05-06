@@ -39,9 +39,31 @@ export function paramsToPhysical(params: FitParameter[]): {
   Lv_H: number[];
   Lv_S: number[];
 } {
-  const get = (name: string) => params.find(p => p.name === name)!.value;
-  const compA = { Tfus: get('Tfus_A'), dHfus: get('dHfus_A') };
-  const compB = { Tfus: get('Tfus_B'), dHfus: get('dHfus_B') };
+  const get = (name: string) => params.find(p => p.name === name)?.value || 0;
+  
+  const extractTransitions = (compPrefix: 'A' | 'B') => {
+    const trans: any[] = [];
+    const tParams = params.filter(p => p.name.startsWith(`Ttrans_${compPrefix}_`));
+    for (const p of tParams) {
+      const idx = p.name.split('_')[2];
+      const T = p.value;
+      const dH = get(`dHtrans_${compPrefix}_${idx}`);
+      if (T > 0) trans.push({ id: p.name, T, dH });
+    }
+    return trans;
+  };
+
+  const compA: PureComponent = { 
+    Tfus: get('Tfus_A'), 
+    dHfus: get('dHfus_A'),
+    transitions: extractTransitions('A')
+  };
+  
+  const compB: PureComponent = { 
+    Tfus: get('Tfus_B'), 
+    dHfus: get('dHfus_B'),
+    transitions: extractTransitions('B')
+  };
   
   const maxV = params.filter(p => p.name.startsWith('L') && p.name.endsWith('_H')).length;
   const Lv_H = [];
