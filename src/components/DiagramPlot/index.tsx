@@ -9,8 +9,17 @@ import { paramsToPhysical } from '../../lib/fitAdapter';
 Chart.register(Title, Tooltip, Legend, Colors);
 
 export const DiagramPlot: Component = () => {
+  const eutX = createMemo(() => {
+    const { dataPoints } = state;
+    if (dataPoints.length === 0) return 0.5;
+    return dataPoints.reduce(
+      (minP, p) => (p.T < minP.T ? p : minP), dataPoints[0]
+    ).xA;
+  });
+
   const chartData = createMemo(() => {
     const { dataPoints, parameters } = state;
+    const ex = eutX();
     
     // Experimental points
     const expPoints = dataPoints.map(p => ({ x: p.xA, y: p.T }));
@@ -20,16 +29,11 @@ export const DiagramPlot: Component = () => {
     const curveA = [];
     const curveB = [];
     
-    // Simple heuristic for eutectic: find min T in experimental data or use 0.5
-    const eutX = dataPoints.length > 0 
-      ? dataPoints.reduce((minX, p) => p.T < state.dataPoints.find(dp => dp.xA === minX)!.T ? p.xA : minX, dataPoints[0].xA)
-      : 0.5;
-
     for (let x = 0; x <= 1.001; x += 0.02) {
-      if (x >= eutX) {
+      if (x >= ex) {
         curveA.push({ x, y: calcTLiquidus(x, 'A', compA, compB, Lv) });
       }
-      if (x <= eutX) {
+      if (x <= ex) {
         curveB.push({ x, y: calcTLiquidus(x, 'B', compA, compB, Lv) });
       }
     }

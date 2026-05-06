@@ -4,6 +4,8 @@ import type { FitParameter, FitPoint } from '../lib/fitAdapter';
 import { calcAllTLiquidus } from '../lib/liquidusSolver';
 import { chiSquared, rwp, correlationMatrix, highCorrelationWarnings } from '../lib/statistics';
 import { Matrix } from 'ml-matrix';
+import { syncToURL, loadFromURL } from '../lib/urlState';
+import { createEffect } from 'solid-js';
 
 // ---------- типы ----------
 export type { FitParameter };
@@ -23,6 +25,7 @@ interface FitState {
   residuals: number[];
   chiSq: number;
   rwpVal: number;
+  covMatrix: number[][];
   corrMatrix: number[][];
   corrWarnings: string[];
   isRunning: boolean;
@@ -38,23 +41,68 @@ const defaultParams: FitParameter[] = [
   { name: 'L0',      value: 0,    fixed: false, min: -50000, max: 50000 },
 ];
 
+const savedState = loadFromURL();
+
 const [state, setState] = createStore<FitState>({
-  dataPoints: [],
-  parameters: defaultParams,
+  dataPoints: savedState?.dataPoints || [],
+  parameters: savedState?.parameters || defaultParams,
   calcT: [],
   residuals: [],
   chiSq: 0,
   rwpVal: 0,
+  covMatrix: [],
   corrMatrix: [],
   corrWarnings: [],
   isRunning: false,
   log: [],
 });
 
+// Авто-синхронизация с URL при изменении данных или параметров
+createEffect(() => {
+  syncToURL({
+    dataPoints: state.dataPoints,
+    parameters: state.parameters,
+  });
+});
+
 // ---------- действия ----------
 
-export function loadData(points: DataPoint[]) {
-  setState('dataPoints', points);
+export function assignBranches() {
+  setState(produce(s => {
+    if (s.dataPoints.length === 0) return;
+    const eutIdx = s.dataPoints.reduce(
+      (minI, p, i) => (p.T < s.dataPoints[minI].T ? i : minI), 0
+    );
+    const xE = s.dataPoints[eutIdx].xA;
+    s.dataPoints.forEach((p, i) => {
+      p.branch = i === eutIdx ? 'eutectic' : p.xA >= xE ? 'A' : 'B';
+    });
+  }));
+}
+
+export function addDataPoint() {
+  setState('dataPoints', p => [
+    ...p,
+    { xA: 0.5, T: 500, sigma: 1, weight: 1, branch: 'A' }
+  ]);
+  assignBranches();
+  recalculate();
+}
+
+export function removeDataPoint(index: number) {
+  setState('dataPoints', p => p.filter((_, i) => i !== index));
+  assignBranches();
+  recalculate();
+}
+
+export function updateDataPoint(index: number, field: keyof DataPoint, value: number) {
+  setState('dataPoints', index, field as any, value);
+  if (field === 'sigma') {
+    setState('dataPoints', index, 'weight', 1 / (value * value));
+  }
+  if (field === 'xA' || field === 'T') {
+    assignBranches();
+  }
   recalculate();
 }
 
@@ -127,11 +175,12 @@ export async function runRefinement() {
       const corr = correlationMatrix(cov);
       const freeNames = finalParams.filter(p => !p.fixed).map(p => p.name);
       setState({
+        covMatrix: covarianceMatrix,
         corrMatrix: corr.to2DArray(),
         corrWarnings: highCorrelationWarnings(corr, freeNames),
       });
     } else {
-      setState({ corrMatrix: [], corrWarnings: [] });
+      setState({ covMatrix: [], corrMatrix: [], corrWarnings: [] });
     }
 
     addLog(`Готово. χ²=${state.chiSq.toFixed(4)}, Rwp=${state.rwpVal.toFixed(4)}`);
@@ -144,6 +193,10 @@ export async function runRefinement() {
 
 function addLog(msg: string) {
   setState('log', l => [...l.slice(-49), `${new Date().toLocaleTimeString()} ${msg}`]);
+}
+
+if (state.dataPoints.length > 0) {
+  recalculate();
 }
 
 export { state };

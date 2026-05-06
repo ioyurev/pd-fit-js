@@ -1,38 +1,68 @@
+import { For } from 'solid-js';
 import type { Component } from 'solid-js';
-import { parseCSV, assignBranches, defaultWeights } from '../../lib/dataParser';
-import { loadData } from '../../store/fitStore';
-import type { DataPoint } from '../../store/fitStore';
+import { state, addDataPoint, removeDataPoint, updateDataPoint } from '../../store/fitStore';
 
 export const DataInput: Component = () => {
-  const onFileUpload = (e: Event) => {
-    const file = (e.target as HTMLInputElement).files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const text = event.target?.result as string;
-      const raw = parseCSV(text);
-      const branched = assignBranches(raw);
-      const weights = defaultWeights(branched);
-      
-      const data: DataPoint[] = branched.map((p, i) => ({
-        xA: p.xA,
-        T: p.T,
-        branch: p.branch as any,
-        weight: weights[i],
-        sigma: p.sigma ?? 1,
-      }));
-      
-      loadData(data);
-    };
-    reader.readAsText(file);
-  };
-
   return (
     <div class="data-input">
-      <h3>Загрузка данных</h3>
-      <input type="file" accept=".csv" onChange={onFileUpload} />
-      <p class="hint">CSV: xA, T (разделитель запятая, заголовок обязателен)</p>
+      <h3>Экспериментальные данные</h3>
+      <table style="width: 100%; border-collapse: collapse;">
+        <thead>
+          <tr style="text-align: left; border-bottom: 1px solid #ddd;">
+            <th>xA</th>
+            <th>T (K)</th>
+            <th>σ</th>
+            <th>Ветвь</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          <For each={state.dataPoints}>
+            {(p, i) => (
+              <tr>
+                <td>
+                  <input
+                    type="number"
+                    step="0.01"
+                    style="width: 60px"
+                    value={p.xA}
+                    onInput={(e) => updateDataPoint(i(), 'xA', parseFloat(e.currentTarget.value))}
+                  />
+                </td>
+                <td>
+                  <input
+                    type="number"
+                    step="1"
+                    style="width: 80px"
+                    value={p.T}
+                    onInput={(e) => updateDataPoint(i(), 'T', parseFloat(e.currentTarget.value))}
+                  />
+                </td>
+                <td>
+                  <input
+                    type="number"
+                    step="0.1"
+                    style="width: 50px"
+                    value={p.sigma}
+                    onInput={(e) => updateDataPoint(i(), 'sigma', parseFloat(e.currentTarget.value))}
+                  />
+                </td>
+                <td style="font-size: 0.8rem; color: #666;">{p.branch}</td>
+                <td>
+                  <button 
+                    onClick={() => removeDataPoint(i())}
+                    style="background: #e74c3c; color: white; border: none; border-radius: 4px; padding: 2px 6px; cursor: pointer;"
+                  >×</button>
+                </td>
+              </tr>
+            )}
+          </For>
+        </tbody>
+      </table>
+      <button 
+        onClick={addDataPoint}
+        style="margin-top: 10px; padding: 5px 10px; background: #3498db; color: white; border: none; border-radius: 4px; cursor: pointer;"
+      >Добавить точку</button>
     </div>
   );
 };

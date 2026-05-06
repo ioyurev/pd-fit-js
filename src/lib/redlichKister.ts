@@ -13,23 +13,29 @@ export function gExcess(xA: number, Lv: number[]): number {
   return xA * xB * sum;
 }
 
-// Аналитические производные через формулу Маргулеса
+// Аналитические производные для модели Редлиха–Кистера
 export function lnGammaA(xA: number, T: number, Lv: number[]): number {
   const xB = 1 - xA;
-  // d(Gex/RT)/d(nA) при const nB
+  const d = xA - xB;
   let sum = 0;
   for (let v = 0; v < Lv.length; v++) {
-    const d = xA - xB;
-    sum += (Lv[v] / (R * T)) * (
-      xB * d ** v - xA * xB * v * d ** (v - 1) * 2
-    );
+    // ln γ_A = x_B² · Σ L_v · [ (x_A - x_B)^v + 2·v·x_A·(x_A - x_B)^(v-1) ] / RT
+    const term = Math.pow(d, v) + (v > 0 ? 2 * v * xA * Math.pow(d, v - 1) : 0);
+    sum += (Lv[v] / (R * T)) * term;
   }
   return xB * xB * sum; 
 }
 
 export function lnGammaB(xA: number, T: number, Lv: number[]): number {
-  // Аналогично для компонента B
-  return lnGammaA(1 - xA, T, Lv.map((l, v) => (v % 2 === 0 ? l : -l)));
+  const xB = 1 - xA;
+  const d = xA - xB;
+  let sum = 0;
+  for (let v = 0; v < Lv.length; v++) {
+    // ln γ_B = x_A² · Σ L_v · [ (x_A - x_B)^v - 2·v·x_B·(x_A - x_B)^(v-1) ] / RT
+    const term = Math.pow(d, v) - (v > 0 ? 2 * v * xB * Math.pow(d, v - 1) : 0);
+    sum += (Lv[v] / (R * T)) * term;
+  }
+  return xA * xA * sum;
 }
 
 // Проверка на расслаивание: d²Gex/dx² + RT/(x(1-x)) > 0 для всех x

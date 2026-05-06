@@ -1,8 +1,8 @@
-// @ts-ignore
 import { levenbergMarquardt } from 'ml-levenberg-marquardt';
 import { calcTLiquidus } from './liquidusSolver';
 import type { Branch } from './liquidusSolver';
 import type { PureComponent } from './thermodynamics';
+import { buildCovarianceMatrix } from './statistics';
 
 export interface FitParameter {
   name: string;
@@ -93,13 +93,42 @@ export function runLM(
 
   const finalParams = unpackParams(result.parameterValues, params);
 
-  // Ковариационная матрица из ml-levenberg-marquardt
+  /**
+   * Вычисляем Якобиан численно для построения ковариационной матрицы.
+   * Это необходимо, так как библиотека ml-levenberg-marquardt не возвращает 
+   * итоговую матрицу Якоби в результате выполнения (только параметры и ошибку).
+   */
   let covMatrix: number[][] = [];
-  if (result.parameterError && result.parameterError > 0) {
-    // Some versions of ml-levenberg-marquardt may return jacobian directly or we need to approximate
-    // Let's assume jacobian is returned if available. Otherwise just empty.
-    // To be safer, if it's not provided we don't calculate it here or we need custom jacobian logic.
-    // I'll wrap it in try-catch in case result.jacobian doesn't exist.
+  const freeParams = finalParams.filter(p => !p.fixed);
+  
+  if (freeParams.length > 0) {
+    const h = 1e-6; // Шаг для численного дифференцирования
+    const jacobian: number[][] = [];
+    const physicalFinal = paramsToPhysical(finalParams);
+
+    for (const p of points) {
+      const row: number[] = [];
+      for (let i = 0; i < freeParams.length; i++) {
+        const originalValue = freeParams[i].value;
+        
+        // f(p + h)
+        freeParams[i].value = originalValue + h;
+        const physicalPlus = paramsToPhysical(finalParams);
+        const valPlus = calcTLiquidus(p.xA, p.branch, physicalPlus.compA, physicalPlus.compB, physicalPlus.Lv);
+        
+        // f(p)
+        freeParams[i].value = originalValue;
+        const val = calcTLiquidus(p.xA, p.branch, physicalFinal.compA, physicalFinal.compB, physicalFinal.Lv);
+        
+        row.push((valPlus - val) / h);
+      }
+      jacobian.push(row);
+    }
+
+    const calcT = points.map(p => calcTLiquidus(p.xA, p.branch, physicalFinal.compA, physicalFinal.compB, physicalFinal.Lv));
+    const residuals = ys.map((y, i) => y - calcT[i]);
+    const cov = buildCovarianceMatrix(jacobian, residuals, ws);
+    covMatrix = cov.to2DArray();
   }
 
   return { params: finalParams, covarianceMatrix: covMatrix };
