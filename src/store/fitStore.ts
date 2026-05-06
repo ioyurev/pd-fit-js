@@ -1,5 +1,5 @@
 import { createStore, produce } from 'solid-js/store';
-import { runLM, paramsToPhysical } from '../lib/fitAdapter';
+import { paramsToPhysical } from '../lib/fitAdapter';
 import type { FitParameter, FitPoint } from '../lib/fitAdapter';
 import { calcAllTLiquidus } from '../lib/liquidusSolver';
 import { chiSquared, rwp, correlationMatrix, highCorrelationWarnings } from '../lib/statistics';
@@ -38,7 +38,8 @@ const defaultParams: FitParameter[] = [
   { name: 'dHfus_A', value: 10000, fixed: true, min: 1000, max: 50000 },
   { name: 'Tfus_B',  value: 900,  fixed: true,  min: 700,  max: 1100 },
   { name: 'dHfus_B', value: 8000, fixed: true,  min: 1000, max: 50000 },
-  { name: 'L0',      value: 0,    fixed: false, min: -50000, max: 50000 },
+  { name: 'L0_H',    value: 0,    fixed: false, min: -100000, max: 100000 },
+  { name: 'L0_S',    value: 0,    fixed: false, min: -200,    max: 200 },
 ];
 
 const savedState = loadFromURL();
@@ -67,41 +68,23 @@ createEffect(() => {
 
 // ---------- действия ----------
 
-export function assignBranches() {
-  setState(produce(s => {
-    if (s.dataPoints.length === 0) return;
-    const eutIdx = s.dataPoints.reduce(
-      (minI, p, i) => (p.T < s.dataPoints[minI].T ? i : minI), 0
-    );
-    const xE = s.dataPoints[eutIdx].xA;
-    s.dataPoints.forEach((p, i) => {
-      p.branch = i === eutIdx ? 'eutectic' : p.xA >= xE ? 'A' : 'B';
-    });
-  }));
-}
-
 export function addDataPoint() {
   setState('dataPoints', p => [
     ...p,
     { xA: 0.5, T: 500, sigma: 1, weight: 1, branch: 'A' }
   ]);
-  assignBranches();
   recalculate();
 }
 
 export function removeDataPoint(index: number) {
   setState('dataPoints', p => p.filter((_, i) => i !== index));
-  assignBranches();
   recalculate();
 }
 
-export function updateDataPoint(index: number, field: keyof DataPoint, value: number) {
+export function updateDataPoint(index: number, field: keyof DataPoint, value: any) {
   setState('dataPoints', index, field as any, value);
   if (field === 'sigma') {
     setState('dataPoints', index, 'weight', 1 / (value * value));
-  }
-  if (field === 'xA' || field === 'T') {
-    assignBranches();
   }
   recalculate();
 }
@@ -112,17 +95,19 @@ export function setParameter(index: number, field: keyof FitParameter, value: un
 }
 
 export function addRKTerm() {
-  const v = state.parameters.filter(p => p.name.startsWith('L')).length;
+  const v = state.parameters.filter(p => p.name.startsWith('L') && p.name.endsWith('_H')).length;
   setState('parameters', p => [
     ...p,
-    { name: `L${v}`, value: 0, fixed: false, min: -50000, max: 50000 },
+    { name: `L${v}_H`, value: 0, fixed: false, min: -100000, max: 100000 },
+    { name: `L${v}_S`, value: 0, fixed: false, min: -200,    max: 200 },
   ]);
 }
 
 export function removeRKTerm() {
-  const Ls = state.parameters.filter(p => p.name.startsWith('L'));
-  if (Ls.length <= 1) return;
-  setState('parameters', p => p.filter(x => x.name !== `L${Ls.length - 1}`));
+  const L_Hs = state.parameters.filter(p => p.name.startsWith('L') && p.name.endsWith('_H'));
+  if (L_Hs.length <= 1) return;
+  const lastIndex = L_Hs.length - 1;
+  setState('parameters', p => p.filter(x => x.name !== `L${lastIndex}_H` && x.name !== `L${lastIndex}_S`));
 }
 
 export function applyStrategy(strategy: 'rk-only' | 'rk-tfus' | 'rk-tfus-dhfus' | 'full') {
@@ -142,10 +127,10 @@ export function recalculate() {
   const { dataPoints, parameters } = state;
   if (!dataPoints.length) return;
 
-  const { compA, compB, Lv } = paramsToPhysical(parameters);
+  const { compA, compB, Lv_H, Lv_S } = paramsToPhysical(parameters);
   const pts = dataPoints.filter(p => p.branch !== 'eutectic');
 
-  const calcT = calcAllTLiquidus(pts as any, compA, compB, Lv);
+  const calcT = calcAllTLiquidus(pts as any, compA, compB, Lv_H, Lv_S);
   const obs   = pts.map(p => p.T);
   const ws    = pts.map(p => p.weight);
   const res   = obs.map((t, i) => t - calcT[i]);
@@ -160,11 +145,45 @@ export function recalculate() {
 
 export async function runRefinement() {
   setState({ isRunning: true });
-  addLog('Запуск уточнения...');
+  addLog('Запуск уточнения в фоне...');
 
   try {
+    // Валидация входных данных
+    for (const p of state.dataPoints) {
+      if (p.xA < 0 || p.xA > 1) {
+        throw new Error(`Недопустимое значение xA: ${p.xA}. Должно быть от 0 до 1.`);
+      }
+      if (p.T <= 0) {
+        throw new Error(`Недопустимое значение T: ${p.T}. Должно быть > 0 K.`);
+      }
+    }
+
     const pts = state.dataPoints.filter(p => p.branch !== 'eutectic') as unknown as FitPoint[];
-    const { params: finalParams, covarianceMatrix } = runLM(pts, state.parameters);
+    
+    const freeParamsCount = state.parameters.filter(p => !p.fixed).length;
+    if (freeParamsCount >= pts.length) {
+      throw new Error(`Количество свободных параметров (${freeParamsCount}) должно быть меньше количества точек (${pts.length}). Degrees of freedom > 0.`);
+    }
+
+    const worker = new Worker(new URL('../workers/fit.worker.ts', import.meta.url), { type: 'module' });
+    
+    const workerResult = await new Promise<any>((resolve, reject) => {
+      worker.onmessage = (e) => {
+        if (e.data.success) {
+          resolve(e.data.result);
+        } else {
+          reject(new Error(e.data.error));
+        }
+        worker.terminate();
+      };
+      worker.onerror = (e) => {
+        reject(new Error('Worker error: ' + e.message));
+        worker.terminate();
+      };
+      worker.postMessage({ points: pts, parameters: JSON.parse(JSON.stringify(state.parameters)) });
+    });
+
+    const { params: finalParams, covarianceMatrix } = workerResult;
 
     setState('parameters', finalParams);
     recalculate();
@@ -173,7 +192,7 @@ export async function runRefinement() {
     if (covarianceMatrix && covarianceMatrix.length > 0) {
       const cov = new Matrix(covarianceMatrix);
       const corr = correlationMatrix(cov);
-      const freeNames = finalParams.filter(p => !p.fixed).map(p => p.name);
+      const freeNames = finalParams.filter((p: FitParameter) => !p.fixed).map((p: FitParameter) => p.name);
       setState({
         covMatrix: covarianceMatrix,
         corrMatrix: corr.to2DArray(),

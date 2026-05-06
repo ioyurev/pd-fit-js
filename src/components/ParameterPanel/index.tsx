@@ -6,7 +6,7 @@ export const ParameterPanel: Component = () => {
   return (
     <div class="parameter-panel">
       <h3>Параметры</h3>
-      <table>
+      <table class="data-table">
         <thead>
           <tr>
             <th>Имя</th>
@@ -24,7 +24,10 @@ export const ParameterPanel: Component = () => {
                 <td>
                   <input
                     type="number"
+                    class="num-input"
+                    style="width: 80px"
                     value={p.value}
+                    disabled={state.isRunning}
                     onInput={(e) => setParameter(i(), 'value', parseFloat(e.currentTarget.value))}
                   />
                 </td>
@@ -32,20 +35,27 @@ export const ParameterPanel: Component = () => {
                   <input
                     type="checkbox"
                     checked={p.fixed}
+                    disabled={state.isRunning}
                     onChange={(e) => setParameter(i(), 'fixed', e.currentTarget.checked)}
                   />
                 </td>
                 <td>
                   <input
                     type="number"
+                    class="num-input"
+                    style="width: 80px"
                     value={p.min}
+                    disabled={state.isRunning}
                     onInput={(e) => setParameter(i(), 'min', parseFloat(e.currentTarget.value))}
                   />
                 </td>
                 <td>
                   <input
                     type="number"
+                    class="num-input"
+                    style="width: 80px"
                     value={p.max}
+                    disabled={state.isRunning}
                     onInput={(e) => setParameter(i(), 'max', parseFloat(e.currentTarget.value))}
                   />
                 </td>
@@ -55,8 +65,8 @@ export const ParameterPanel: Component = () => {
         </tbody>
       </table>
       <div class="actions">
-        <button onClick={addRKTerm}>Добавить L_v</button>
-        <button onClick={removeRKTerm}>Удалить L_v</button>
+        <button class="btn-primary" onClick={addRKTerm} disabled={state.isRunning}>Добавить пару L_v (H, S)</button>
+        <button class="btn-primary" onClick={removeRKTerm} disabled={state.isRunning}>Удалить пару L_v (H, S)</button>
       </div>
     </div>
   );

@@ -27,21 +27,21 @@ export const ReportPanel: Component = () => {
   return (
     <div class="report-panel">
       <h3>Итоговые параметры</h3>
-      <table style="width: 100%; border-collapse: collapse;">
+      <table class="data-table">
         <thead>
-          <tr style="text-align: left; border-bottom: 1px solid #ddd;">
-            <th style="padding: 8px;">Параметр</th>
-            <th style="padding: 8px;">Значение</th>
-            <th style="padding: 8px;">Погрешность</th>
+          <tr>
+            <th>Параметр</th>
+            <th>Значение</th>
+            <th>Погрешность</th>
           </tr>
         </thead>
         <tbody>
           <For each={state.parameters}>
             {(p) => (
-              <tr style="border-bottom: 1px solid #eee;">
-                <td style="padding: 8px;">{p.name}</td>
-                <td style="padding: 8px;">{p.value.toFixed(4)}</td>
-                <td style="padding: 8px;">
+              <tr>
+                <td>{p.name}</td>
+                <td>{p.value.toFixed(4)}</td>
+                <td>
                   {p.fixed 
                     ? <span style="color: #999;">фикс.</span> 
                     : (paramErrors()[p.name] !== undefined ? paramErrors()[p.name].toFixed(4) : '—')}
@@ -54,7 +54,8 @@ export const ReportPanel: Component = () => {
 
       <button 
         onClick={shareURL}
-        style="margin-top: 20px; padding: 10px; background: #2ecc71; color: white; border: none; border-radius: 4px; cursor: pointer; width: 100%;"
+        class="btn-share"
+        disabled={state.isRunning}
       >
         Поделиться (копировать URL)
       </button>

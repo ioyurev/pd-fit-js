@@ -77,7 +77,7 @@ function brent(f: (x: number) => number, lower: number, upper: number, tolerance
     }
   }
   
-  return b;
+  throw new Error('Метод Брента не сошелся за 100 итераций');
 }
 
 export function calcTLiquidus(
@@ -85,18 +85,25 @@ export function calcTLiquidus(
   branch: Branch,
   compA: PureComponent,
   compB: PureComponent,
-  Lv: number[],
+  Lv_H: number[],
+  Lv_S: number[],
   Tmin = 200,
   Tmax = 3000,
 ): number {
   const f = (T: number) => {
+    const Lv = Lv_H.map((H, i) => H - T * Lv_S[i]);
     const gammaA = Math.exp(lnGammaA(xA, T, Lv));
     const gammaB = Math.exp(lnGammaB(xA, T, Lv));
     return branch === 'A'
       ? liquidusResidualA(T, xA, gammaA, compA)
       : liquidusResidualB(T, 1 - xA, gammaB, compB);
   };
-  return brent(f, Tmin, Tmax, 1e-6);
+  try {
+    return brent(f, Tmin, Tmax, 1e-6);
+  } catch (e) {
+    console.error(e);
+    return NaN;
+  }
 }
 
 // Вычислить T_calc для массива точек
@@ -104,7 +111,8 @@ export function calcAllTLiquidus(
   points: Array<{ xA: number; branch: Branch }>,
   compA: PureComponent,
   compB: PureComponent,
-  Lv: number[],
+  Lv_H: number[],
+  Lv_S: number[],
 ): number[] {
-  return points.map(p => calcTLiquidus(p.xA, p.branch, compA, compB, Lv));
+  return points.map(p => calcTLiquidus(p.xA, p.branch, compA, compB, Lv_H, Lv_S));
 }

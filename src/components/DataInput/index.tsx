@@ -6,9 +6,9 @@ export const DataInput: Component = () => {
   return (
     <div class="data-input">
       <h3>Экспериментальные данные</h3>
-      <table style="width: 100%; border-collapse: collapse;">
+      <table class="data-table">
         <thead>
-          <tr style="text-align: left; border-bottom: 1px solid #ddd;">
+          <tr>
             <th>xA</th>
             <th>T (K)</th>
             <th>σ</th>
@@ -24,8 +24,10 @@ export const DataInput: Component = () => {
                   <input
                     type="number"
                     step="0.01"
+                    class="num-input"
                     style="width: 60px"
                     value={p.xA}
+                    disabled={state.isRunning}
                     onInput={(e) => updateDataPoint(i(), 'xA', parseFloat(e.currentTarget.value))}
                   />
                 </td>
@@ -33,8 +35,10 @@ export const DataInput: Component = () => {
                   <input
                     type="number"
                     step="1"
+                    class="num-input"
                     style="width: 80px"
                     value={p.T}
+                    disabled={state.isRunning}
                     onInput={(e) => updateDataPoint(i(), 'T', parseFloat(e.currentTarget.value))}
                   />
                 </td>
@@ -42,16 +46,30 @@ export const DataInput: Component = () => {
                   <input
                     type="number"
                     step="0.1"
+                    class="num-input"
                     style="width: 50px"
                     value={p.sigma}
+                    disabled={state.isRunning}
                     onInput={(e) => updateDataPoint(i(), 'sigma', parseFloat(e.currentTarget.value))}
                   />
                 </td>
-                <td style="font-size: 0.8rem; color: #666;">{p.branch}</td>
+                <td>
+                  <select 
+                    value={p.branch} 
+                    disabled={state.isRunning}
+                    onChange={(e) => updateDataPoint(i(), 'branch', e.currentTarget.value)}
+                    style="font-size: 0.8rem;"
+                  >
+                    <option value="A">Ветвь A</option>
+                    <option value="B">Ветвь B</option>
+                    <option value="eutectic">Эвтектика</option>
+                  </select>
+                </td>
                 <td>
                   <button 
                     onClick={() => removeDataPoint(i())}
-                    style="background: #e74c3c; color: white; border: none; border-radius: 4px; padding: 2px 6px; cursor: pointer;"
+                    class="btn-delete"
+                    disabled={state.isRunning}
                   >×</button>
                 </td>
               </tr>
@@ -61,7 +79,9 @@ export const DataInput: Component = () => {
       </table>
       <button 
         onClick={addDataPoint}
-        style="margin-top: 10px; padding: 5px 10px; background: #3498db; color: white; border: none; border-radius: 4px; cursor: pointer;"
+        class="btn-primary"
+        style="margin-top: 10px;"
+        disabled={state.isRunning}
       >Добавить точку</button>
     </div>
   );

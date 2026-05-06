@@ -9,12 +9,27 @@ import { paramsToPhysical } from '../../lib/fitAdapter';
 Chart.register(Title, Tooltip, Legend, Colors);
 
 export const DiagramPlot: Component = () => {
+  // Поиск точки пересечения ветвей (эвтектики) методом дихотомии
   const eutX = createMemo(() => {
-    const { dataPoints } = state;
-    if (dataPoints.length === 0) return 0.5;
-    return dataPoints.reduce(
-      (minP, p) => (p.T < minP.T ? p : minP), dataPoints[0]
-    ).xA;
+    const { parameters } = state;
+    const { compA, compB, Lv_H, Lv_S } = paramsToPhysical(parameters);
+
+    const f = (x: number) => {
+      const Ta = calcTLiquidus(x, 'A', compA, compB, Lv_H, Lv_S);
+      const Tb = calcTLiquidus(x, 'B', compA, compB, Lv_H, Lv_S);
+      return Ta - Tb;
+    };
+
+    // f(0) = TfusA - (~Tb) > 0 обычно
+    // f(1) = (~Ta) - TfusB < 0 обычно
+    // Ищем x где f(x) = 0
+    let low = 0, high = 1;
+    for (let i = 0; i < 30; i++) {
+      const mid = (low + high) / 2;
+      if (f(mid) > 0) low = mid;
+      else high = mid;
+    }
+    return (low + high) / 2;
   });
 
   const chartData = createMemo(() => {
@@ -25,17 +40,25 @@ export const DiagramPlot: Component = () => {
     const expPoints = dataPoints.map(p => ({ x: p.xA, y: p.T }));
     
     // Calculated curve (smooth)
-    const { compA, compB, Lv } = paramsToPhysical(parameters);
+    const { compA, compB, Lv_H, Lv_S } = paramsToPhysical(parameters);
     const curveA = [];
     const curveB = [];
     
-    for (let x = 0; x <= 1.001; x += 0.02) {
-      if (x >= ex) {
-        curveA.push({ x, y: calcTLiquidus(x, 'A', compA, compB, Lv) });
-      }
-      if (x <= ex) {
-        curveB.push({ x, y: calcTLiquidus(x, 'B', compA, compB, Lv) });
-      }
+    const Teut = calcTLiquidus(ex, 'A', compA, compB, Lv_H, Lv_S);
+
+    // Ветвь B (слева направо до эвтектики)
+    for (let x = 0; x < ex; x += 0.02) {
+      curveB.push({ x, y: calcTLiquidus(x, 'B', compA, compB, Lv_H, Lv_S) });
+    }
+    curveB.push({ x: ex, y: Teut });
+
+    // Ветвь A (справа налево до эвтектики)
+    curveA.push({ x: ex, y: Teut });
+    for (let x = ex + 0.02; x <= 1.001; x += 0.02) {
+      curveA.push({ x, y: calcTLiquidus(x, 'A', compA, compB, Lv_H, Lv_S) });
+    }
+    if (curveA[curveA.length-1].x < 1) {
+       curveA.push({ x: 1, y: calcTLiquidus(1, 'A', compA, compB, Lv_H, Lv_S) });
     }
 
     return {
@@ -69,6 +92,7 @@ export const DiagramPlot: Component = () => {
   });
 
   const options = {
+    animation: false,
     responsive: true,
     maintainAspectRatio: false,
     scales: {

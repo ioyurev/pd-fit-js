@@ -1,12 +1,13 @@
+import LZString from 'lz-string';
+
 export function encodeState(state: any): string {
   const json = JSON.stringify(state);
-  // Use btoa with encodeURIComponent for better Unicode support
-  return btoa(encodeURIComponent(json));
+  return LZString.compressToEncodedURIComponent(json);
 }
 
 export function decodeState(base64: string): any {
   try {
-    const json = decodeURIComponent(atob(base64));
+    const json = LZString.decompressFromEncodedURIComponent(base64);
     return JSON.parse(json);
   } catch (e) {
     console.error('Failed to decode state from URL', e);

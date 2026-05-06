@@ -36,15 +36,22 @@ function unpackParams(
 export function paramsToPhysical(params: FitParameter[]): {
   compA: PureComponent;
   compB: PureComponent;
-  Lv: number[];
+  Lv_H: number[];
+  Lv_S: number[];
 } {
   const get = (name: string) => params.find(p => p.name === name)!.value;
   const compA = { Tfus: get('Tfus_A'), dHfus: get('dHfus_A') };
   const compB = { Tfus: get('Tfus_B'), dHfus: get('dHfus_B') };
-  const Lv = params
-    .filter(p => p.name.startsWith('L'))
-    .map(p => p.value);
-  return { compA, compB, Lv };
+  
+  const maxV = params.filter(p => p.name.startsWith('L') && p.name.endsWith('_H')).length;
+  const Lv_H = [];
+  const Lv_S = [];
+  for (let v = 0; v < maxV; v++) {
+    Lv_H.push(get(`L${v}_H`));
+    Lv_S.push(get(`L${v}_S`));
+  }
+  
+  return { compA, compB, Lv_H, Lv_S };
 }
 
 export function runLM(
@@ -61,11 +68,11 @@ export function runLM(
   // ParameterizedFunction: (params: number[]) => (x: number) => number
   function model(freePacked: number[]): (index: number) => number {
     const updated = unpackParams(freePacked, paramsFull);
-    const { compA, compB, Lv } = paramsToPhysical(updated);
+    const { compA, compB, Lv_H, Lv_S } = paramsToPhysical(updated);
     
     return function(index: number): number {
       const p = points[index];
-      return calcTLiquidus(p.xA, p.branch, compA, compB, Lv);
+      return calcTLiquidus(p.xA, p.branch, compA, compB, Lv_H, Lv_S);
     };
   }
 
@@ -114,18 +121,23 @@ export function runLM(
         // f(p + h)
         freeParams[i].value = originalValue + h;
         const physicalPlus = paramsToPhysical(finalParams);
-        const valPlus = calcTLiquidus(p.xA, p.branch, physicalPlus.compA, physicalPlus.compB, physicalPlus.Lv);
+        const valPlus = calcTLiquidus(p.xA, p.branch, physicalPlus.compA, physicalPlus.compB, physicalPlus.Lv_H, physicalPlus.Lv_S);
         
-        // f(p)
+        // f(p - h)
+        freeParams[i].value = originalValue - h;
+        const physicalMinus = paramsToPhysical(finalParams);
+        const valMinus = calcTLiquidus(p.xA, p.branch, physicalMinus.compA, physicalMinus.compB, physicalMinus.Lv_H, physicalMinus.Lv_S);
+        
+        // Центральная разность для повышения точности
+        row.push((valPlus - valMinus) / (2 * h));
+
+        // Восстанавливаем значение
         freeParams[i].value = originalValue;
-        const val = calcTLiquidus(p.xA, p.branch, physicalFinal.compA, physicalFinal.compB, physicalFinal.Lv);
-        
-        row.push((valPlus - val) / h);
       }
       jacobian.push(row);
     }
 
-    const calcT = points.map(p => calcTLiquidus(p.xA, p.branch, physicalFinal.compA, physicalFinal.compB, physicalFinal.Lv));
+    const calcT = points.map(p => calcTLiquidus(p.xA, p.branch, physicalFinal.compA, physicalFinal.compB, physicalFinal.Lv_H, physicalFinal.Lv_S));
     const residuals = ys.map((y, i) => y - calcT[i]);
     const cov = buildCovarianceMatrix(jacobian, residuals, ws);
     covMatrix = cov.to2DArray();
