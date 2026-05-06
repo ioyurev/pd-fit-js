@@ -13,7 +13,7 @@ export const DataInput: Component = () => {
       <table class="data-table">
         <thead>
           <tr>
-            <th>xA</th>
+            <th>xB</th>
             <th>T (K)</th>
             <th>σ</th>
             <th>Ветвь</th>
@@ -29,9 +29,9 @@ export const DataInput: Component = () => {
                     type="number"
                     step="0.01"
                     class="num-input input-sm"
-                    value={p.xA}
+                    value={p.xB}
                     disabled={state.isRunning}
-                    onInput={(e) => updateDataPoint(i(), 'xA', parseFloat(e.currentTarget.value))}
+                    onInput={(e) => updateDataPoint(i(), 'xB', parseFloat(e.currentTarget.value))}
                   />
                 </td>
                 <td>

@@ -11,7 +11,7 @@ import { createEffect } from 'solid-js';
 export type { FitParameter };
 
 export interface DataPoint {
-  xA: number;
+  xB: number;
   T: number;
   weight: number;
   sigma: number;
@@ -87,7 +87,7 @@ createEffect(() => {
 export function addDataPoint() {
   setState('dataPoints', p => [
     ...p,
-    { xA: 0.5, T: 500, sigma: 1, weight: 1, branch: 'A' }
+    { xB: 0.5, T: 500, sigma: 1, weight: 1, branch: 'A' }
   ]);
   recalculate();
 }
@@ -191,8 +191,8 @@ export async function runRefinement() {
   try {
     // Валидация входных данных
     for (const p of state.dataPoints) {
-      if (p.xA < 0 || p.xA > 1) {
-        throw new Error(`Недопустимое значение xA: ${p.xA}. Должно быть от 0 до 1.`);
+      if (p.xB < 0 || p.xB > 1) {
+        throw new Error(`Недопустимое значение xB: ${p.xB}. Должно быть от 0 до 1.`);
       }
       if (p.T <= 0) {
         throw new Error(`Недопустимое значение T: ${p.T}. Должно быть > 0 K.`);
@@ -203,7 +203,8 @@ export async function runRefinement() {
     const rawDataPoints = unwrap(state.dataPoints);
     const rawParameters = unwrap(state.parameters);
 
-    const pts = rawDataPoints.filter(p => p.branch !== 'eutectic') as unknown as FitPoint[];
+    // Точки эвтектики теперь тоже участвуют в фиттинге!
+    const pts = rawDataPoints as unknown as FitPoint[];
     
     const freeParamsCount = rawParameters.filter(p => !p.fixed).length;
     if (freeParamsCount >= pts.length) {

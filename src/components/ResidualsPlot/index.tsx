@@ -18,8 +18,8 @@ export const ResidualsPlot: Component = () => {
     for (const p of dataPoints) {
       if (p.branch === 'eutectic') continue;
       const r = residuals[resIdx++];
-      if (p.branch === 'A') ptsA.push({ x: p.xA, y: r });
-      else ptsB.push({ x: p.xA, y: r });
+      if (p.branch === 'A') ptsA.push({ x: p.xB, y: r });
+      else ptsB.push({ x: p.xB, y: r });
     }
 
     return {
@@ -56,7 +56,7 @@ export const ResidualsPlot: Component = () => {
     maintainAspectRatio: false,
     scales: {
       x: {
-        title: { display: true, text: 'xA' },
+        title: { display: true, text: 'xB' },
         min: 0,
         max: 1,
       },

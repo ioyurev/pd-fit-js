@@ -52,3 +52,27 @@ export function checkMiscibility(Lv: number[], T: number, steps = 50): boolean {
   }
   return true;
 }
+
+// Расчет парциального вклада для компонента A (x_A = 1 - x_B)
+export function partialExcessA(xA: number, Lv: number[]): number {
+  const xB = 1 - xA;
+  const d = xA - xB;
+  let sum = 0;
+  for (let v = 0; v < Lv.length; v++) {
+    const term = Math.pow(d, v) + (v > 0 ? 2 * v * xA * Math.pow(d, v - 1) : 0);
+    sum += Lv[v] * term;
+  }
+  return xB * xB * sum; 
+}
+
+// Расчет парциального вклада для компонента B
+export function partialExcessB(xA: number, Lv: number[]): number {
+  const xB = 1 - xA;
+  const d = xA - xB;
+  let sum = 0;
+  for (let v = 0; v < Lv.length; v++) {
+    const term = Math.pow(d, v) - (v > 0 ? 2 * v * xB * Math.pow(d, v - 1) : 0);
+    sum += Lv[v] * term;
+  }
+  return xA * xA * sum;
+}

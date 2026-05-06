@@ -13,7 +13,7 @@ export interface FitParameter {
 }
 
 export interface FitPoint {
-  xA: number;
+  xB: number;
   T: number;
   weight: number;
   branch: Branch;
@@ -94,7 +94,7 @@ export function runLM(
     
     return function(index: number): number {
       const p = points[index];
-      return calcTLiquidus(p.xA, p.branch, compA, compB, Lv_H, Lv_S);
+      return calcTLiquidus(p.xB, p.branch, compA, compB, Lv_H, Lv_S);
     };
   }
 
@@ -143,12 +143,12 @@ export function runLM(
         // f(p + h)
         freeParams[i].value = originalValue + h;
         const physicalPlus = paramsToPhysical(finalParams);
-        const valPlus = calcTLiquidus(p.xA, p.branch, physicalPlus.compA, physicalPlus.compB, physicalPlus.Lv_H, physicalPlus.Lv_S);
+        const valPlus = calcTLiquidus(p.xB, p.branch, physicalPlus.compA, physicalPlus.compB, physicalPlus.Lv_H, physicalPlus.Lv_S);
         
         // f(p - h)
         freeParams[i].value = originalValue - h;
         const physicalMinus = paramsToPhysical(finalParams);
-        const valMinus = calcTLiquidus(p.xA, p.branch, physicalMinus.compA, physicalMinus.compB, physicalMinus.Lv_H, physicalMinus.Lv_S);
+        const valMinus = calcTLiquidus(p.xB, p.branch, physicalMinus.compA, physicalMinus.compB, physicalMinus.Lv_H, physicalMinus.Lv_S);
         
         // Центральная разность для повышения точности
         row.push((valPlus - valMinus) / (2 * h));
@@ -159,7 +159,7 @@ export function runLM(
       jacobian.push(row);
     }
 
-    const calcT = points.map(p => calcTLiquidus(p.xA, p.branch, physicalFinal.compA, physicalFinal.compB, physicalFinal.Lv_H, physicalFinal.Lv_S));
+    const calcT = points.map(p => calcTLiquidus(p.xB, p.branch, physicalFinal.compA, physicalFinal.compB, physicalFinal.Lv_H, physicalFinal.Lv_S));
     const residuals = ys.map((y, i) => y - calcT[i]);
     const cov = buildCovarianceMatrix(jacobian, residuals, ws);
     covMatrix = cov.to2DArray();

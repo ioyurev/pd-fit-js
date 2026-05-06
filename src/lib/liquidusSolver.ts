@@ -1,93 +1,45 @@
-import { liquidusResidualA, liquidusResidualB } from './thermodynamics';
+import { R } from './thermodynamics';
 import type { PureComponent } from './thermodynamics';
-import { lnGammaA, lnGammaB } from './redlichKister';
+import { partialExcessA, partialExcessB } from './redlichKister';
 
-// Ветвь может быть 'A', 'B', 'eutectic' или 'Ttrans_A_0', 'Ttrans_B_1' и т.д.
 export type Branch = string;
 
-// Simple Brent's method implementation
-function brent(f: (x: number) => number, lower: number, upper: number, tolerance: number): number {
-  let a = lower;
-  let b = upper;
-  let fa = f(a);
-  let fb = f(b);
+// АНАЛИТИЧЕСКОЕ РЕШЕНИЕ
+function getTAnalytical(xSolvent: number, comp: PureComponent, GexH: number, GexS: number): number {
+  if (xSolvent <= 0) return 0;
+  if (xSolvent >= 1) return comp.Tfus;
+
+  const sortedTrans = [...comp.transitions].sort((a, b) => b.T - a.T);
   
-  if (fa * fb >= 0) {
-    if (Math.abs(fa) < Math.abs(fb)) return a;
-    return b;
-  }
-  
-  if (Math.abs(fa) < Math.abs(fb)) {
-    [a, b] = [b, a];
-    [fa, fb] = [fb, fa];
-  }
-  
-  let c = a;
-  let fc = fa;
-  let s = 0;
-  let fs = 0;
-  let mflag = true;
-  let d = 0;
-  
-  for (let iter = 0; iter < 100; iter++) {
-    if (Math.abs(b - a) < tolerance || fb === 0) {
-      return b;
-    }
-    
-    if (fa !== fc && fb !== fc) {
-      s = a * fb * fc / ((fa - fb) * (fa - fc)) +
-          b * fa * fc / ((fb - fa) * (fb - fc)) +
-          c * fa * fb / ((fc - fa) * (fc - fb));
-    } else {
-      s = b - fb * (b - a) / (fb - fa);
-    }
-    
-    const condition1 = (s < (3 * a + b) / 4 || s > b) && (s > (3 * a + b) / 4 || s < b);
-    const condition2 = mflag && Math.abs(s - b) >= Math.abs(b - c) / 2;
-    const condition3 = !mflag && Math.abs(s - b) >= Math.abs(c - d) / 2;
-    const condition4 = mflag && Math.abs(b - c) < Math.abs(tolerance);
-    const condition5 = !mflag && Math.abs(c - d) < Math.abs(tolerance);
-    
-    if (condition1 || condition2 || condition3 || condition4 || condition5) {
-      s = (a + b) / 2;
-      mflag = true;
-    } else {
-      mflag = false;
-    }
-    
-    fs = f(s);
-    d = c;
-    c = b;
-    fc = fb;
-    
-    if (fa * fs < 0) {
-      b = s;
-      fb = fs;
-    } else {
-      a = s;
-      fa = fs;
-    }
-    
-    if (Math.abs(fa) < Math.abs(fb)) {
-      [a, b] = [b, a];
-      [fa, fb] = [fb, fa];
+  let dHeff = comp.dHfus;
+  let dSeff = comp.dHfus / comp.Tfus;
+
+  // Формула: T = (dH + GexH) / (dS - R*ln(x) + GexS)
+  let T = (dHeff + GexH) / (dSeff - R * Math.log(xSolvent) + GexS);
+
+  // Учет полиморфных переходов по закону Гесса
+  for (const trans of sortedTrans) {
+    if (trans.T > 0 && T <= trans.T) {
+      dHeff += trans.dH;
+      dSeff += trans.dH / trans.T;
+      T = (dHeff + GexH) / (dSeff - R * Math.log(xSolvent) + GexS);
     }
   }
   
-  throw new Error('Метод Брента не сошелся за 100 итераций');
+  return T;
 }
 
 export function calcTLiquidus(
-  xA: number,
+  xB: number,
   branch: Branch,
   compA: PureComponent,
   compB: PureComponent,
   Lv_H: number[],
-  Lv_S: number[],
-  Tmin = 200,
-  Tmax = 3000,
+  Lv_S: number[]
 ): number {
-  // Обработка точек полиморфных переходов напрямую (горизонтальная линия)
+  if (branch === 'eutectic') {
+    return findEutectic(compA, compB, Lv_H, Lv_S).T;
+  }
   if (branch.startsWith('Ttrans_A_')) {
     const t = compA.transitions.find(trans => trans.id === branch);
     return t ? t.T : 0;
@@ -97,29 +49,45 @@ export function calcTLiquidus(
     return t ? t.T : 0;
   }
 
-  const f = (T: number) => {
-    const Lv = Lv_H.map((H, i) => H - T * Lv_S[i]);
-    const gammaA = Math.exp(lnGammaA(xA, T, Lv));
-    const gammaB = Math.exp(lnGammaB(xA, T, Lv));
-    return branch === 'A'
-      ? liquidusResidualA(T, xA, gammaA, compA)
-      : liquidusResidualB(T, 1 - xA, gammaB, compB);
-  };
-  try {
-    return brent(f, Tmin, Tmax, 1e-6);
-  } catch (e) {
-    console.error(e);
-    return NaN;
+  const xA = 1 - xB;
+
+  if (branch === 'A') {
+    const GexH = partialExcessA(xA, Lv_H);
+    const GexS = partialExcessA(xA, Lv_S);
+    return getTAnalytical(xA, compA, GexH, GexS);
+  } else {
+    const GexH = partialExcessB(xA, Lv_H);
+    const GexS = partialExcessB(xA, Lv_S);
+    return getTAnalytical(xB, compB, GexH, GexS);
   }
 }
 
-// Вычислить T_calc для массива точек
+// Универсальный поиск эвтектики сканированием сетки (надежно при расслаивании)
+export function findEutectic(compA: PureComponent, compB: PureComponent, Lv_H: number[], Lv_S: number[]): { xB: number, T: number } {
+  let minT = Infinity;
+  let bestX = 0.5;
+  
+  // 2000 точек гарантируют точность до 0.0005. Работает за доли миллисекунды.
+  for (let i = 0; i <= 2000; i++) {
+    const xB = i / 2000;
+    const Ta = calcTLiquidus(xB, 'A', compA, compB, Lv_H, Lv_S);
+    const Tb = calcTLiquidus(xB, 'B', compA, compB, Lv_H, Lv_S);
+    
+    const Tsys = Math.max(Ta, Tb);
+    if (Tsys < minT) {
+      minT = Tsys;
+      bestX = xB;
+    }
+  }
+  return { xB: bestX, T: minT };
+}
+
 export function calcAllTLiquidus(
-  points: Array<{ xA: number; branch: Branch }>,
+  points: Array<{ xB: number; branch: Branch }>,
   compA: PureComponent,
   compB: PureComponent,
   Lv_H: number[],
   Lv_S: number[],
 ): number[] {
-  return points.map(p => calcTLiquidus(p.xA, p.branch, compA, compB, Lv_H, Lv_S));
+  return points.map(p => calcTLiquidus(p.xB, p.branch, compA, compB, Lv_H, Lv_S));
 }
