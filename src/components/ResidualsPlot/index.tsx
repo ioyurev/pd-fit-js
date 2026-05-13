@@ -1,10 +1,31 @@
 import { createMemo } from 'solid-js';
 import type { Component } from 'solid-js';
-import { Chart, Title, Tooltip, Legend, Colors } from 'chart.js';
+import {
+  Chart,
+  Title,
+  Tooltip,
+  Legend,
+  Colors,
+  LinearScale,
+  PointElement,
+  LineElement,
+  ScatterController,
+  LineController
+} from 'chart.js';
 import { Scatter } from 'solid-chartjs';
 import { state } from '../../store/fitStore';
 
-Chart.register(Title, Tooltip, Legend, Colors);
+Chart.register(
+  Title,
+  Tooltip,
+  Legend,
+  Colors,
+  LinearScale,
+  PointElement,
+  LineElement,
+  ScatterController,
+  LineController
+);
 
 export const ResidualsPlot: Component = () => {
   const chartData = createMemo(() => {
