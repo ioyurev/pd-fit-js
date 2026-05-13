@@ -1,7 +1,7 @@
 import { createStore, produce, unwrap } from 'solid-js/store';
 import { paramsToPhysical } from '../lib/fitAdapter';
 import type { FitParameter, FitPoint } from '../lib/fitAdapter';
-import { calcAllTLiquidus } from '../lib/liquidusSolver';
+import { calcAllTLiquidus, calcTLiquidus, findEutectic } from '../lib/liquidusSolver';
 import { chiSquared, rwp, correlationMatrix, highCorrelationWarnings } from '../lib/statistics';
 import { Matrix } from 'ml-matrix';
 import { syncToURL, loadFromURL } from '../lib/urlState';
@@ -147,19 +147,6 @@ export function removeTransition(comp: 'A'|'B') {
   });
 }
 
-export function applyStrategy(strategy: 'rk-only' | 'rk-tfus' | 'rk-tfus-dhfus' | 'full') {
-  setState('parameters', produce(params => {
-    for (const p of params) {
-      if (p.name.startsWith('L')) { p.fixed = false; continue; }
-      p.fixed = !(
-        (strategy === 'rk-tfus' && p.name.startsWith('Tfus')) ||
-        (strategy === 'rk-tfus-dhfus') ||
-        (strategy === 'full')
-      );
-    }
-  }));
-}
-
 export function recalculate() {
   const { dataPoints, parameters } = state;
   if (!dataPoints.length) return;
@@ -178,6 +165,35 @@ export function recalculate() {
     chiSq: chiSquared(res, ws),
     rwpVal: rwp(res, ws, obs),
   });
+}
+
+// ---------- Экспорт таблицы ликвидуса ----------
+export interface LiquidusRow {
+  xB: number;
+  T_A: number | null;
+  T_B: number | null;
+  T_liq: number; // max(T_A, T_B)
+}
+
+export function getLiquidusTableData(steps = 200): LiquidusRow[] {
+  const { parameters } = state;
+  const { compA, compB, Lv_H, Lv_S } = paramsToPhysical(parameters);
+  const eut = findEutectic(compA, compB, Lv_H, Lv_S);
+  const ex = eut.xB;
+
+  const rows: LiquidusRow[] = [];
+
+  for (let i = 0; i <= steps; i++) {
+    const xB = i / steps;
+    // Обе ветви считаются на всём интервале [0, 1]
+    const T_A = calcTLiquidus(xB, 'A', compA, compB, Lv_H, Lv_S);
+    const T_B = calcTLiquidus(xB, 'B', compA, compB, Lv_H, Lv_S);
+    // Общий ликвидус — минимум двух ветвей выше эвтектики
+    const T_liq = xB <= ex ? T_A : T_B;
+    rows.push({ xB, T_A, T_B, T_liq });
+  }
+
+  return rows;
 }
 
 export function toggleLog() {

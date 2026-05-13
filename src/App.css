@@ -14,12 +14,27 @@ header {
   background: #2c3e50;
   color: white;
   flex-shrink: 0; /* Шапка не должна сжиматься */
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
 header h1 {
   margin: 0;
   font-size: 1.5rem;
 }
+
+.btn-help {
+  padding: 6px 16px;
+  background: transparent;
+  color: white;
+  border: 1px solid rgba(255,255,255,0.6);
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.95rem;
+}
+.btn-help:hover { background: rgba(255,255,255,0.15); }
+
 
 main {
   display: flex;
@@ -174,6 +189,33 @@ select.select-sm {
 .main-chart { height: 400px; }
 .residual-chart { height: 250px; }
 
+/* --- КНОПКИ ЭКСПОРТА --- */
+.btn-export {
+  flex: 1;
+  padding: 8px 12px;
+  background: #8e44ad;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition: background 0.15s;
+}
+.btn-export:hover { background: #7d3c98; }
+.btn-export:disabled { background: #bdc3c7; cursor: not-allowed; }
+
+.export-section {
+  margin-top: 1rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid #eee;
+}
+.export-section h4 {
+  margin: 0 0 0.5rem 0;
+  font-size: 0.95rem;
+  color: #555;
+}
+
 /* --- МОДАЛЬНОЕ ОКНО ЛОГА --- */
 .modal-overlay {
   position: fixed;
@@ -209,6 +251,44 @@ select.select-sm {
 .modal-header h3 {
   margin: 0;
 }
+
+/* --- СПРАВКА --- */
+.help-modal-content {
+  max-width: 820px;
+  width: 92%;
+  max-height: 90vh;
+}
+
+.help-body {
+  overflow-y: auto;
+  flex: 1;
+  padding-right: 0.5rem;
+  line-height: 1.7;
+}
+
+.help-body h3 {
+  margin: 1.5rem 0 0.4rem;
+  color: #2c3e50;
+  border-bottom: 1px solid #eee;
+  padding-bottom: 0.2rem;
+}
+
+.help-body p, .help-body ol, .help-body li {
+  margin: 0.4rem 0;
+}
+
+.help-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0.5rem 0 1rem;
+  font-size: 0.9rem;
+}
+.help-table th, .help-table td {
+  border: 1px solid #ddd;
+  padding: 6px 10px;
+  text-align: left;
+}
+.help-table th { background: #f4f4f4; font-weight: bold; }
 
 .log-pre {
   background: #eee;
