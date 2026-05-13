@@ -1,5 +1,6 @@
 import { createMemo, For } from 'solid-js';
 import type { Component } from 'solid-js';
+import { utils, writeFile } from 'xlsx';
 import { state, getLiquidusTableData } from '../../store/fitStore';
 import { Katex } from '../Katex';
 
@@ -31,35 +32,73 @@ export const ReportPanel: Component = () => {
     return errors;
   });
 
-  const exportParams = () => {
+  const exportParams = (format: 'csv' | 'xlsx') => {
     const errors = paramErrors();
-    const lines = [
-      'Параметр,Значение,Погрешность,Фиксирован',
-      ...state.parameters.map(p => {
-        const err = p.fixed ? 'фикс.' : (errors[p.name] !== undefined ? errors[p.name].toFixed(6) : '—');
-        return `${p.name},${p.value.toFixed(6)},${err},${p.fixed ? 'да' : 'нет'}`;
-      }),
-      '',
-      `chi2,${state.chiSq.toFixed(6)},,`,
-      `Rwp,${(state.rwpVal * 100).toFixed(4)}%,,`,
-    ];
-    downloadCSV('parameters.csv', lines.join('\r\n'));
+    const parameters = state.parameters;
+
+    if (format === 'csv') {
+      const lines = [
+        'Параметр,Значение,Погрешность,Фиксирован',
+        ...parameters.map(p => {
+          const valStr = p.value.toFixed(6);
+          const err = p.fixed ? 'фикс.' : (errors[p.name] !== undefined ? errors[p.name].toFixed(6) : '—');
+          const fixedStr = p.fixed ? 'да' : 'нет';
+          return `${p.name},${valStr},${err},${fixedStr}`;
+        }),
+        '',
+        `chi2,${state.chiSq.toFixed(6)},,`,
+        `Rwp,${(state.rwpVal * 100).toFixed(4)}%,,`,
+      ];
+      downloadCSV('parameters.csv', lines.join('\r\n'));
+    } else {
+      const data = parameters.map(p => ({
+        'Параметр': p.name,
+        'Значение': p.value,
+        'Погрешность': p.fixed ? 'фикс.' : (errors[p.name] !== undefined ? errors[p.name] : null),
+        'Фиксирован': p.fixed ? 'да' : 'нет'
+      }));
+      const ws = utils.json_to_sheet(data);
+      const wb = utils.book_new();
+      utils.book_append_sheet(wb, ws, 'Parameters');
+      
+      // Добавляем статистику в конец
+      utils.sheet_add_aoa(ws, [
+        [],
+        ['chi2', state.chiSq],
+        ['Rwp (%)', state.rwpVal * 100]
+      ], { origin: -1 });
+
+      writeFile(wb, 'parameters.xlsx');
+    }
   };
 
-  const exportLiquidus = () => {
+  const exportLiquidus = (format: 'csv' | 'xlsx') => {
     const rows = getLiquidusTableData();
-    const lines = [
-      'xB,T_liquidus_A (K),T_liquidus_B (K),T_liquidus (K)',
-      ...rows.map(r =>
-        [
-          r.xB.toFixed(4),
-          r.T_A !== null ? r.T_A.toFixed(4) : '',
-          r.T_B !== null ? r.T_B.toFixed(4) : '',
-          r.T_liq.toFixed(4),
-        ].join(',')
-      ),
-    ];
-    downloadCSV('liquidus.csv', lines.join('\r\n'));
+    if (format === 'csv') {
+      const lines = [
+        'xB,T_liquidus_A (K),T_liquidus_B (K),T_liquidus (K)',
+        ...rows.map(r =>
+          [
+            r.xB.toFixed(4),
+            r.T_A !== null ? r.T_A.toFixed(4) : '',
+            r.T_B !== null ? r.T_B.toFixed(4) : '',
+            r.T_liq.toFixed(4),
+          ].join(',')
+        ),
+      ];
+      downloadCSV('liquidus.csv', lines.join('\r\n'));
+    } else {
+      const data = rows.map(r => ({
+        'xB': r.xB,
+        'T_liquidus_A (K)': r.T_A,
+        'T_liquidus_B (K)': r.T_B,
+        'T_liquidus (K)': r.T_liq
+      }));
+      const ws = utils.json_to_sheet(data);
+      const wb = utils.book_new();
+      utils.book_append_sheet(wb, ws, 'Liquidus');
+      writeFile(wb, 'liquidus.xlsx');
+    }
   };
 
   return (
@@ -102,12 +141,18 @@ export const ReportPanel: Component = () => {
         </dl>
       </div>
 
-      <div class="actions">
-        <button onClick={exportParams} class="btn-export" disabled={state.isRunning}>
-          ⬇ Параметры (CSV)
+      <div class="actions" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+        <button onClick={() => exportParams('csv')} class="btn-export" disabled={state.isRunning}>
+          ⬇ Парам. (CSV)
         </button>
-        <button onClick={exportLiquidus} class="btn-export" disabled={state.isRunning}>
-          ⬇ Ликвидус (CSV)
+        <button onClick={() => exportParams('xlsx')} class="btn-export" disabled={state.isRunning} style="background: #27ae60;">
+          ⬇ Парам. (XLSX)
+        </button>
+        <button onClick={() => exportLiquidus('csv')} class="btn-export" disabled={state.isRunning}>
+          ⬇ Ликвид. (CSV)
+        </button>
+        <button onClick={() => exportLiquidus('xlsx')} class="btn-export" disabled={state.isRunning} style="background: #27ae60;">
+          ⬇ Ликвид. (XLSX)
         </button>
       </div>
 
