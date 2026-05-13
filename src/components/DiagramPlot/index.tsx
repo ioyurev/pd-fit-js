@@ -93,7 +93,6 @@ export const DiagramPlot: Component = () => {
         data: [{ x: 0, y: trans.T }, { x: intersectPoint.x, y: trans.T }],
         borderColor: 'rgba(54, 162, 235, 0.6)',
         borderWidth: 1.5,
-        borderDash: [5, 5],
         pointRadius: 0,
         type: 'line' as const,
       });
@@ -108,7 +107,6 @@ export const DiagramPlot: Component = () => {
         data: [{ x: intersectPoint.x, y: trans.T }, { x: 1, y: trans.T }],
         borderColor: 'rgba(75, 192, 192, 0.6)',
         borderWidth: 1.5,
-        borderDash: [5, 5],
         pointRadius: 0,
         type: 'line' as const,
       });
@@ -118,6 +116,7 @@ export const DiagramPlot: Component = () => {
   });
 
   const options = {
+    animation: false as const,
     responsive: true,
     maintainAspectRatio: false,
     scales: {
