@@ -1,345 +1,454 @@
-/* --- APP SHELL LAYOUT --- */
+/* ── RESET ── */
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body {
+  margin: 0; padding: 0;
+  width: 100vw; height: 100vh;
+  overflow: hidden;
+  font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
+  font-size: 14px;
+  color: #213547;
+  background: #f0f2f5;
+}
+
+#root { width: 100%; height: 100%; }
+
+/* ── APP SHELL ── */
 .app-container {
   display: flex;
   flex-direction: column;
   height: 100%;
   width: 100%;
-  font-family: sans-serif;
-  color: #333;
   overflow: hidden;
 }
 
+/* ── HEADER ── */
 header {
-  padding: 1rem;
-  background: #2c3e50;
-  color: white;
-  flex-shrink: 0; /* Шапка не должна сжиматься */
   display: flex;
   align-items: center;
   justify-content: space-between;
+  padding: 0 1.25rem;
+  height: 48px;
+  background: #1e2d3d;
+  color: white;
+  flex-shrink: 0;
 }
 
 header h1 {
   margin: 0;
-  font-size: 1.5rem;
+  font-size: 1.15rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
 }
+
+.header-actions { display: flex; gap: 0.5rem; align-items: center; }
 
 .btn-help {
-  padding: 6px 16px;
+  padding: 4px 14px;
   background: transparent;
-  color: white;
-  border: 1px solid rgba(255,255,255,0.6);
+  color: rgba(255,255,255,0.85);
+  border: 1px solid rgba(255,255,255,0.4);
   border-radius: 4px;
   cursor: pointer;
-  font-size: 0.95rem;
+  font-size: 0.85rem;
 }
-.btn-help:hover { background: rgba(255,255,255,0.15); }
+.btn-help:hover { background: rgba(255,255,255,0.1); }
 
-
+/* ── MAIN LAYOUT ── */
 main {
   display: flex;
   flex: 1;
-  overflow: hidden; /* Главный контейнер не скроллится */
+  overflow: hidden;
+  gap: 0;
 }
 
+/* ── LEFT PANEL ── */
 .left-panel {
-  width: 450px;
+  width: 420px;
   flex-shrink: 0;
-  overflow-y: auto; /* Внутренний скролл левой панели */
-  border-right: 1px solid #ddd;
-  padding: 1rem;
-  background: #f9f9f9;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  background: #fff;
+  border-right: 1px solid #dde1e7;
 }
 
+.left-panel section {
+  padding: 0.875rem 1rem;
+  border-bottom: 1px solid #edf0f4;
+  flex-shrink: 0;
+}
+
+.left-panel section:last-child { border-bottom: none; }
+
+/* ── RIGHT PANEL ── */
 .right-panel {
   flex: 1;
-  min-width: 0; /* Предотвращает разрыв флексбокса от широких графиков */
-  overflow-y: auto; /* Внутренний скролл правой панели */
-  padding: 1rem;
+  min-width: 0;
+  overflow: hidden;
+  padding: 0.75rem;
+  background: #f0f2f5;
+}
+
+.right-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  grid-template-rows: 1fr 220px auto;
+  grid-template-areas:
+    "diagram"
+    "residuals"
+    "report";
+  gap: 0.75rem;
+  height: 100%;
+}
+
+.pane-diagram   { grid-area: diagram; }
+.pane-residuals { grid-area: residuals; }
+.pane-report    { grid-area: report; }
+
+/* Каждая панель — белая карточка */
+.pane-diagram,
+.pane-residuals,
+.pane-report {
+  background: #fff;
+  border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  overflow: hidden;
   display: flex;
   flex-direction: column;
-  gap: 1rem;
 }
 
-/* --- COMPONENTS --- */
-section {
-  margin-bottom: 2rem;
-  background: white;
-  padding: 1rem;
-  border-radius: 4px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+/* ── SECTION HEADINGS ── */
+h3 {
+  margin: 0 0 0.6rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #1e2d3d;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
-/* Убираем нижний отступ у последней секции в панелях */
-section:last-child {
-  margin-bottom: 0;
-}
-
-.plot-section {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
-/* --- ТАБЛИЦЫ --- */
+/* ── DATA TABLE ── */
 .data-table {
   width: 100%;
   border-collapse: collapse;
+  font-size: 0.82rem;
 }
-
-.data-table th, 
+.data-table th,
 .data-table td {
-  padding: 8px 4px;
+  padding: 5px 4px;
   text-align: left;
   border-bottom: 1px solid #eee;
+  white-space: nowrap;
 }
-
 .data-table th {
-  border-bottom: 1px solid #ddd;
-  font-weight: bold;
+  font-weight: 600;
+  color: #555;
+  border-bottom: 2px solid #ddd;
 }
+.data-table tr:last-child td { border-bottom: none; }
 
-.data-table tr:last-child td {
-  border-bottom: none;
-}
-
-/* --- ИНПУТЫ И РАЗМЕРЫ --- */
+/* ── INPUTS ── */
 .num-input {
   border: 1px solid #ccc;
-  border-radius: 4px;
-  padding: 4px;
+  border-radius: 3px;
+  padding: 3px 4px;
+  font-size: 0.82rem;
+  background: #fafafa;
 }
+.num-input:focus { outline: none; border-color: #3498db; background: #fff; }
 
-.input-xs { width: 50px; }
-.input-sm { width: 60px; }
-.input-md { width: 80px; }
+.input-xs   { width: 48px; }
+.input-sm   { width: 58px; }
+.input-md   { width: 75px; }
 .input-full { width: 100%; }
 
 select.select-sm {
   font-size: 0.8rem;
-  padding: 2px;
+  padding: 2px 4px;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  background: #fafafa;
 }
 
-/* --- КНОПКИ --- */
+/* ── BUTTONS ── */
 .btn-primary {
-  padding: 6px 12px;
+  padding: 5px 10px;
   background: #3498db;
   color: white;
   border: none;
   border-radius: 4px;
   cursor: pointer;
+  font-size: 0.82rem;
 }
-.btn-primary:hover { background: #2980b9; }
+.btn-primary:hover   { background: #2980b9; }
 .btn-primary:disabled { background: #bdc3c7; cursor: not-allowed; }
 
 .btn-delete {
   background: #e74c3c;
   color: white;
   border: none;
-  border-radius: 4px;
-  padding: 4px 8px;
+  border-radius: 3px;
+  padding: 2px 7px;
   cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  font-size: 0.85rem;
+  line-height: 1.4;
 }
-.btn-delete:hover { background: #c0392b; }
+.btn-delete:hover    { background: #c0392b; }
 .btn-delete:disabled { background: #bdc3c7; cursor: not-allowed; }
 
-.btn-share {
-  padding: 10px;
-  background: #2ecc71;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  width: 100%;
-  font-weight: bold;
-}
-.btn-share:hover { background: #27ae60; }
-.btn-share:disabled { background: #bdc3c7; cursor: not-allowed; }
-
-.run-btn {
-  width: 100%;
-  padding: 0.75rem;
-  background: #27ae60;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-weight: bold;
-}
-.run-btn:disabled { background: #95a5a6; cursor: not-allowed; }
-
-.actions { margin-top: 1rem; display: flex; gap: 0.5rem; }
-.strategies { margin-bottom: 1rem; display: flex; gap: 0.5rem; }
-.mt-3 { margin-top: 1rem; }
-
-/* --- УТИЛИТЫ ДЛЯ ТЕКСТА --- */
-.text-muted {
-  color: #999;
-  font-size: 0.85rem;
-}
-
-/* --- КОНТЕЙНЕРЫ ГРАФИКОВ --- */
-.chart-container {
-  width: 100%;
-  position: relative; /* Chart.js требует relative родителя */
-}
-.main-chart { height: 400px; }
-.residual-chart { height: 250px; }
-
-/* --- КНОПКИ ЭКСПОРТА --- */
 .btn-export {
-  flex: 1;
-  padding: 8px 12px;
+  padding: 5px 10px;
   background: #8e44ad;
   color: white;
   border: none;
   border-radius: 4px;
   cursor: pointer;
-  font-size: 0.9rem;
-  font-weight: 500;
-  transition: background 0.15s;
+  font-size: 0.82rem;
 }
-.btn-export:hover { background: #7d3c98; }
+.btn-export:hover    { background: #7d3c98; }
 .btn-export:disabled { background: #bdc3c7; cursor: not-allowed; }
 
-.export-section {
-  margin-top: 1rem;
-  padding-top: 0.5rem;
-  border-top: 1px solid #eee;
+.btn-share-sm {
+  padding: 5px 10px;
+  background: #27ae60;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.82rem;
 }
-.export-section h4 {
-  margin: 0 0 0.5rem 0;
+.btn-share-sm:hover    { background: #219a52; }
+.btn-share-sm:disabled { background: #bdc3c7; cursor: not-allowed; }
+
+.btn-log {
+  padding: 5px 10px;
+  background: #7f8c8d;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.82rem;
+}
+.btn-log:hover { background: #6c7a7b; }
+
+.run-btn {
+  width: 100%;
+  padding: 0.6rem;
+  background: #27ae60;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 600;
   font-size: 0.95rem;
-  color: #555;
+}
+.run-btn:hover    { background: #219a52; }
+.run-btn:disabled { background: #95a5a6; cursor: not-allowed; }
+
+/* ── ACTIONS ROW ── */
+.actions      { margin-top: 0.6rem; display: flex; gap: 0.4rem; flex-wrap: wrap; }
+.mt-3         { margin-top: 0.75rem; }
+.hint-text    { font-size: 0.8rem; color: #888; margin: 0 0 0.6rem; }
+
+/* ── CHARTS ── */
+.chart-container {
+  width: 100%;
+  position: relative;
+  flex: 1;
+  min-height: 0;
 }
 
-/* --- МОДАЛЬНОЕ ОКНО ЛОГА --- */
+.pane-diagram .chart-container,
+.pane-residuals .chart-container { height: 100%; }
+
+/* ── RESIDUALS PANE ── */
+.residuals-wrap {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 0.5rem 0.75rem 0.5rem;
+}
+.residuals-header {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  flex-shrink: 0;
+  margin-bottom: 0.25rem;
+}
+.residuals-title {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #555;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.residuals-hint { font-size: 0.75rem; color: #999; }
+
+/* ── REPORT PANE ── */
+.report-panel {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  gap: 0.75rem;
+  padding: 0.6rem 0.875rem;
+  flex-wrap: wrap;
+}
+
+.report-stats {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.3rem;
+  min-width: 110px;
+  border-right: 1px solid #eee;
+  padding-right: 0.75rem;
+}
+.stat-item { display: flex; align-items: baseline; gap: 0.4rem; }
+.stat-label { font-size: 0.8rem; color: #777; min-width: 36px; }
+.stat-value { font-size: 1rem; font-weight: 600; color: #1e2d3d; }
+.warn-badge {
+  font-size: 0.75rem;
+  color: #e67e22;
+  cursor: help;
+  margin-top: 0.25rem;
+}
+
+.report-params-wrap {
+  flex: 1;
+  overflow-x: auto;
+  min-width: 200px;
+}
+.report-table { font-size: 0.8rem; }
+.num-cell { font-variant-numeric: tabular-nums; }
+
+.report-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  justify-content: center;
+  min-width: 130px;
+}
+
+/* ── PARAMETER PANEL ── */
+.param-minmax {
+  display: none;
+}
+.show-minmax .param-minmax {
+  display: table-cell;
+}
+
+/* ── REFINEMENT ── */
+.refinement-control { }
+
+/* ── MODALS ── */
 .modal-overlay {
   position: fixed;
-  top: 0; left: 0; width: 100%; height: 100%;
-  background: rgba(0, 0, 0, 0.5);
+  inset: 0;
+  background: rgba(0,0,0,0.45);
   display: flex;
   justify-content: center;
   align-items: center;
   z-index: 10000;
 }
-
 .modal-content {
   background: white;
-  padding: 1.5rem;
+  padding: 1.25rem 1.5rem;
   border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.18);
   width: 80%;
   max-width: 600px;
-  max-height: 80vh;
+  max-height: 85vh;
   display: flex;
   flex-direction: column;
 }
-
 .modal-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 1rem;
-  border-bottom: 1px solid #eee;
+  margin-bottom: 0.875rem;
   padding-bottom: 0.5rem;
-}
-
-.modal-header h3 {
-  margin: 0;
-}
-
-/* --- СПРАВКА --- */
-.help-modal-content {
-  max-width: 820px;
-  width: 92%;
-  max-height: 90vh;
-}
-
-.help-body {
-  overflow-y: auto;
-  flex: 1;
-  padding-right: 0.5rem;
-  line-height: 1.7;
-}
-
-.help-body h3 {
-  margin: 1.5rem 0 0.4rem;
-  color: #2c3e50;
   border-bottom: 1px solid #eee;
-  padding-bottom: 0.2rem;
+  flex-shrink: 0;
 }
-
-.help-body p, .help-body ol, .help-body li {
-  margin: 0.4rem 0;
-}
-
-.help-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin: 0.5rem 0 1rem;
-  font-size: 0.9rem;
-}
-.help-table th, .help-table td {
-  border: 1px solid #ddd;
-  padding: 6px 10px;
-  text-align: left;
-}
-.help-table th { background: #f4f4f4; font-weight: bold; }
-
+.modal-header h2, .modal-header h3 { margin: 0; font-size: 1rem; }
 .log-pre {
-  background: #eee;
+  background: #f4f4f4;
   padding: 0.5rem;
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   font-family: monospace;
   flex: 1;
   overflow-y: auto;
   border-radius: 4px;
   margin: 0;
   white-space: pre-wrap;
-  word-wrap: break-word;
+  word-break: break-all;
 }
 
-/* --- СТАТИСТИКА --- */
-dl {
-  display: grid;
-  grid-template-columns: 100px 1fr;
-  margin: 0;
+/* ── HELP MODAL ── */
+.help-modal-content {
+  max-width: 860px;
+  width: 94%;
+  max-height: 92vh;
 }
-dt { font-weight: bold; }
-.warnings {
-  color: #c0392b;
+.help-body {
+  overflow-y: auto;
+  flex: 1;
+  padding-right: 0.5rem;
+  line-height: 1.75;
   font-size: 0.9rem;
-  margin-top: 1rem;
 }
+.help-body h3 {
+  margin: 1.4rem 0 0.35rem;
+  font-size: 0.95rem;
+  text-transform: none;
+  letter-spacing: 0;
+  color: #1e2d3d;
+  border-bottom: 1px solid #eee;
+  padding-bottom: 0.2rem;
+}
+.help-body p, .help-body li { margin: 0.35rem 0; }
+.help-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0.5rem 0 0.75rem;
+  font-size: 0.85rem;
+}
+.help-table th, .help-table td {
+  border: 1px solid #ddd;
+  padding: 5px 9px;
+  text-align: left;
+}
+.help-table th { background: #f5f5f5; font-weight: 600; }
 
-/* --- OVERLAY ЗАГРУЗКИ --- */
+/* ── LOADING OVERLAY ── */
 .loading-overlay {
   position: fixed;
-  top: 0; left: 0; width: 100%; height: 100%;
-  background: rgba(255, 255, 255, 0.7);
+  inset: 0;
+  background: rgba(255,255,255,0.72);
   display: flex;
   justify-content: center;
   align-items: center;
   z-index: 9999;
-  font-weight: bold;
-  color: #2c3e50;
+  font-weight: 600;
+  color: #1e2d3d;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
+  backdrop-filter: blur(2px);
 }
-
 .spinner {
-  width: 40px; height: 40px;
-  border: 4px solid #f3f3f3;
-  border-top: 4px solid #3498db;
+  width: 36px; height: 36px;
+  border: 3px solid #ddd;
+  border-top-color: #3498db;
   border-radius: 50%;
-  animation: spin 1s linear infinite;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
+/* ── MISC ── */
+.text-muted { color: #aaa; font-size: 0.8rem; }
+
+/* ── DIAGRAM PANE padding ── */
+.pane-diagram { padding: 0.5rem 0.75rem 0.25rem; }

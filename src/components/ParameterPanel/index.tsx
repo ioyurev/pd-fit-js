@@ -1,12 +1,15 @@
-import { For, createMemo } from 'solid-js';
+import { For, createMemo, createSignal } from 'solid-js';
 import type { Component } from 'solid-js';
-import { state, setParameter, addRKTerm, removeRKTerm, addTransition, removeTransition } from '../../store/fitStore';
+import {
+  state, setParameter, addRKTerm, removeRKTerm,
+  addTransition, removeTransition
+} from '../../store/fitStore';
 import { Katex } from '../Katex';
 
 function getParamMeta(name: string): { label: string; unit: string } {
-  if (name === 'Tfus_A')  return { label: 'T_{\\mathrm{fus},A}',  unit: '\\text{К}' };
+  if (name === 'Tfus_A')  return { label: 'T_{\\mathrm{fus},A}',         unit: '\\text{К}' };
   if (name === 'dHfus_A') return { label: '\\Delta H_{\\mathrm{fus},A}', unit: '\\text{Дж/моль}' };
-  if (name === 'Tfus_B')  return { label: 'T_{\\mathrm{fus},B}',  unit: '\\text{К}' };
+  if (name === 'Tfus_B')  return { label: 'T_{\\mathrm{fus},B}',         unit: '\\text{К}' };
   if (name === 'dHfus_B') return { label: '\\Delta H_{\\mathrm{fus},B}', unit: '\\text{Дж/моль}' };
 
   const lhMatch = name.match(/^L(\d+)_H$/);
@@ -31,78 +34,97 @@ function getParamMeta(name: string): { label: string; unit: string } {
 }
 
 export const ParameterPanel: Component = () => {
+  const [showBounds, setShowBounds] = createSignal(false);
+
   return (
     <div class="parameter-panel">
-      <h3>Параметры</h3>
-      <table class="data-table">
-        <thead>
-          <tr>
-            <th>Параметр</th>
-            <th>Ед.</th>
-            <th>Значение</th>
-            <th>Фикс.</th>
-            <th>Min</th>
-            <th>Max</th>
-          </tr>
-        </thead>
-        <tbody>
-          <For each={state.parameters}>
-            {(p, i) => {
-              const meta = createMemo(() => getParamMeta(p.name));
-              return (
-                <tr>
-                  <td><Katex math={meta().label} /></td>
-                  <td><Katex math={meta().unit} /></td>
-                  <td>
-                    <input
-                      type="number"
-                      class="num-input input-md"
-                      value={p.value}
-                      disabled={state.isRunning}
-                      onInput={(e) => setParameter(i(), 'value', parseFloat(e.currentTarget.value))}
-                    />
-                  </td>
-                  <td>
-                    <input
-                      type="checkbox"
-                      checked={p.fixed}
-                      disabled={state.isRunning}
-                      onChange={(e) => setParameter(i(), 'fixed', e.currentTarget.checked)}
-                    />
-                  </td>
-                  <td>
-                    <input
-                      type="number"
-                      class="num-input input-md"
-                      value={p.min}
-                      disabled={state.isRunning}
-                      onInput={(e) => setParameter(i(), 'min', parseFloat(e.currentTarget.value))}
-                    />
-                  </td>
-                  <td>
-                    <input
-                      type="number"
-                      class="num-input input-md"
-                      value={p.max}
-                      disabled={state.isRunning}
-                      onInput={(e) => setParameter(i(), 'max', parseFloat(e.currentTarget.value))}
-                    />
-                  </td>
-                </tr>
-              );
-            }}
-          </For>
-        </tbody>
-      </table>
-      <div class="actions">
-        <button class="btn-primary" onClick={addRKTerm} disabled={state.isRunning}>
-          + пара <Katex math="L_v^H, L_v^S" />
-        </button>
-        <button class="btn-primary" onClick={removeRKTerm} disabled={state.isRunning}>
-          − пара <Katex math="L_v" />
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem;">
+        <h3 style="margin:0;">Параметры</h3>
+        <button
+          class="btn-primary"
+          style="font-size:0.75rem; padding:3px 8px; background:#95a5a6;"
+          onClick={() => setShowBounds(v => !v)}
+        >
+          {showBounds() ? 'Скрыть Min/Max' : 'Показать Min/Max'}
         </button>
       </div>
-      <div class="actions mt-3">
+
+      <div style="overflow-x:auto;">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Параметр</th>
+              <th>Ед.</th>
+              <th>Значение</th>
+              <th title="Фиксировать">Фикс.</th>
+              {showBounds() && <th>Min</th>}
+              {showBounds() && <th>Max</th>}
+            </tr>
+          </thead>
+          <tbody>
+            <For each={state.parameters}>
+              {(p, i) => {
+                const meta = createMemo(() => getParamMeta(p.name));
+                return (
+                  <tr>
+                    <td><Katex math={meta().label} /></td>
+                    <td style="font-size:0.75rem;"><Katex math={meta().unit} /></td>
+                    <td>
+                      <input
+                        type="number"
+                        class="num-input input-md"
+                        value={p.value}
+                        disabled={state.isRunning}
+                        onInput={(e) => setParameter(i(), 'value', parseFloat(e.currentTarget.value))}
+                      />
+                    </td>
+                    <td style="text-align:center;">
+                      <input
+                        type="checkbox"
+                        checked={p.fixed}
+                        disabled={state.isRunning}
+                        onChange={(e) => setParameter(i(), 'fixed', e.currentTarget.checked)}
+                      />
+                    </td>
+                    {showBounds() && (
+                      <td>
+                        <input
+                          type="number"
+                          class="num-input input-md"
+                          value={p.min}
+                          disabled={state.isRunning}
+                          onInput={(e) => setParameter(i(), 'min', parseFloat(e.currentTarget.value))}
+                        />
+                      </td>
+                    )}
+                    {showBounds() && (
+                      <td>
+                        <input
+                          type="number"
+                          class="num-input input-md"
+                          value={p.max}
+                          disabled={state.isRunning}
+                          onInput={(e) => setParameter(i(), 'max', parseFloat(e.currentTarget.value))}
+                        />
+                      </td>
+                    )}
+                  </tr>
+                );
+              }}
+            </For>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="actions">
+        <button class="btn-primary" onClick={addRKTerm} disabled={state.isRunning}>
+          + <Katex math="L_v^H,\,L_v^S" />
+        </button>
+        <button class="btn-primary" onClick={removeRKTerm} disabled={state.isRunning}>
+          − <Katex math="L_v" />
+        </button>
+      </div>
+      <div class="actions">
         <button class="btn-primary" onClick={() => addTransition('A')} disabled={state.isRunning}>+ Переход A</button>
         <button class="btn-primary" onClick={() => removeTransition('A')} disabled={state.isRunning}>− Переход A</button>
         <button class="btn-primary" onClick={() => addTransition('B')} disabled={state.isRunning}>+ Переход B</button>

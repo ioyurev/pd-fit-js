@@ -1,7 +1,7 @@
 import { createMemo, For } from 'solid-js';
 import type { Component } from 'solid-js';
 import { utils, writeFile } from 'xlsx';
-import { state, getLiquidusTableData } from '../../store/fitStore';
+import { state, getLiquidusTableData, toggleLog } from '../../store/fitStore';
 import { Katex } from '../Katex';
 
 function downloadCSV(filename: string, content: string) {
@@ -34,16 +34,14 @@ export const ReportPanel: Component = () => {
 
   const exportParams = (format: 'csv' | 'xlsx') => {
     const errors = paramErrors();
-    const parameters = state.parameters;
-
     if (format === 'csv') {
       const lines = [
         'Параметр,Значение,Погрешность,Фиксирован',
-        ...parameters.map(p => {
-          const valStr = p.value.toFixed(6);
-          const err = p.fixed ? 'фикс.' : (errors[p.name] !== undefined ? errors[p.name].toFixed(6) : '—');
-          const fixedStr = p.fixed ? 'да' : 'нет';
-          return `${p.name},${valStr},${err},${fixedStr}`;
+        ...state.parameters.map(p => {
+          const err = p.fixed
+            ? 'фикс.'
+            : (errors[p.name] !== undefined ? errors[p.name].toFixed(6) : '—');
+          return `${p.name},${p.value.toFixed(6)},${err},${p.fixed ? 'да' : 'нет'}`;
         }),
         '',
         `chi2,${state.chiSq.toFixed(6)},,`,
@@ -51,7 +49,7 @@ export const ReportPanel: Component = () => {
       ];
       downloadCSV('parameters.csv', lines.join('\r\n'));
     } else {
-      const data = parameters.map(p => ({
+      const data = state.parameters.map(p => ({
         'Параметр': p.name,
         'Значение': p.value,
         'Погрешность': p.fixed ? 'фикс.' : (errors[p.name] !== undefined ? errors[p.name] : null),
@@ -60,14 +58,11 @@ export const ReportPanel: Component = () => {
       const ws = utils.json_to_sheet(data);
       const wb = utils.book_new();
       utils.book_append_sheet(wb, ws, 'Parameters');
-      
-      // Добавляем статистику в конец
       utils.sheet_add_aoa(ws, [
         [],
         ['chi2', state.chiSq],
         ['Rwp (%)', state.rwpVal * 100]
       ], { origin: -1 });
-
       writeFile(wb, 'parameters.xlsx');
     }
   };
@@ -103,62 +98,80 @@ export const ReportPanel: Component = () => {
 
   return (
     <div class="report-panel">
-      <h3>Итоговые параметры</h3>
-      <table class="data-table">
-        <thead>
-          <tr>
-            <th>Параметр</th>
-            <th>Значение</th>
-            <th><Katex math="\pm\,\sigma" /></th>
-          </tr>
-        </thead>
-        <tbody>
-          <For each={state.parameters}>
-            {(p) => (
-              <tr>
-                <td><code>{p.name}</code></td>
-                <td>{p.value.toFixed(4)}</td>
-                <td>
-                  {p.fixed
-                    ? <span class="text-muted">фикс.</span>
-                    : (paramErrors()[p.name] !== undefined
-                        ? `± ${paramErrors()[p.name].toFixed(4)}`
-                        : '—')}
-                </td>
-              </tr>
-            )}
-          </For>
-        </tbody>
-      </table>
-
-      <div class="export-section">
-        <h4>Статистика подгонки</h4>
-        <dl>
-          <dt><Katex math="\chi^2" /></dt>
-          <dd>{state.chiSq.toFixed(4)}</dd>
-          <dt><Katex math="R_{wp}" /></dt>
-          <dd>{(state.rwpVal * 100).toFixed(2)}%</dd>
-        </dl>
+      {/* Статистика */}
+      <div class="report-stats">
+        <div class="stat-item">
+          <span class="stat-label"><Katex math="\chi^2" /></span>
+          <span class="stat-value">{state.chiSq.toFixed(4)}</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label"><Katex math="R_{wp}" /></span>
+          <span class="stat-value">{(state.rwpVal * 100).toFixed(2)}%</span>
+        </div>
+        <div class="stat-item stat-warnings">
+          {state.corrWarnings.length > 0 && (
+            <span class="warn-badge" title={state.corrWarnings.join('\n')}>
+              ⚠ {state.corrWarnings.length} корреляций
+            </span>
+          )}
+        </div>
       </div>
 
-      <div class="actions" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-        <button onClick={() => exportParams('csv')} class="btn-export" disabled={state.isRunning}>
-          ⬇ Парам. (CSV)
-        </button>
-        <button onClick={() => exportParams('xlsx')} class="btn-export" disabled={state.isRunning} style="background: #27ae60;">
-          ⬇ Парам. (XLSX)
-        </button>
-        <button onClick={() => exportLiquidus('csv')} class="btn-export" disabled={state.isRunning}>
-          ⬇ Ликвид. (CSV)
-        </button>
-        <button onClick={() => exportLiquidus('xlsx')} class="btn-export" disabled={state.isRunning} style="background: #27ae60;">
-          ⬇ Ликвид. (XLSX)
-        </button>
+      {/* Таблица параметров */}
+      <div class="report-params-wrap">
+        <table class="data-table report-table">
+          <thead>
+            <tr>
+              <th>Параметр</th>
+              <th>Значение</th>
+              <th><Katex math="\pm\,\sigma" /></th>
+            </tr>
+          </thead>
+          <tbody>
+            <For each={state.parameters}>
+              {(p) => (
+                <tr>
+                  <td><code>{p.name}</code></td>
+                  <td class="num-cell">{p.value.toFixed(4)}</td>
+                  <td class="num-cell">
+                    {p.fixed
+                      ? <span class="text-muted">фикс.</span>
+                      : (paramErrors()[p.name] !== undefined
+                          ? `± ${paramErrors()[p.name].toFixed(4)}`
+                          : '—')}
+                  </td>
+                </tr>
+              )}
+            </For>
+          </tbody>
+        </table>
       </div>
 
-      <button onClick={shareURL} class="btn-share mt-3" disabled={state.isRunning}>
-        Поделиться (копировать URL)
-      </button>
+      {/* Действия */}
+      <div class="report-actions">
+        <div style="display: flex; gap: 4px;">
+          <button onClick={() => exportParams('csv')} class="btn-export" style="flex: 1;" disabled={state.isRunning}>
+            CSV
+          </button>
+          <button onClick={() => exportParams('xlsx')} class="btn-export" style="flex: 1; background: #27ae60;" disabled={state.isRunning}>
+            XLSX
+          </button>
+        </div>
+        <div style="display: flex; gap: 4px;">
+          <button onClick={() => exportLiquidus('csv')} class="btn-export" style="flex: 1;" disabled={state.isRunning}>
+            Liq CSV
+          </button>
+          <button onClick={() => exportLiquidus('xlsx')} class="btn-export" style="flex: 1; background: #27ae60;" disabled={state.isRunning}>
+            Liq XLSX
+          </button>
+        </div>
+        <button onClick={shareURL} class="btn-share-sm" disabled={state.isRunning}>
+          🔗 URL
+        </button>
+        <button onClick={toggleLog} class="btn-log">
+          📋 Лог ({state.log.length})
+        </button>
+      </div>
     </div>
   );
 };

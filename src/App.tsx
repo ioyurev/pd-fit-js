@@ -5,7 +5,6 @@ import { ParameterPanel } from './components/ParameterPanel';
 import { DiagramPlot } from './components/DiagramPlot';
 import { ResidualsPlot } from './components/ResidualsPlot';
 import { RefinementControl } from './components/RefinementControl';
-import { StatisticsPanel } from './components/StatisticsPanel';
 import { ReportPanel } from './components/ReportPanel';
 import { LogModal } from './components/LogModal';
 import { HelpModal } from './components/HelpModal';
@@ -26,24 +25,38 @@ const App: Component = () => {
 
       <header>
         <h1>PD-Fit JS</h1>
-        <button class="btn-help" onClick={() => setHelpOpen(true)}>
-          ? Справка
-        </button>
+        <div class="header-actions">
+          <button class="btn-help" onClick={() => setHelpOpen(true)}>? Справка</button>
+        </div>
       </header>
 
       <main>
+        {/* ЛЕВАЯ ПАНЕЛЬ */}
         <div class="left-panel">
-          <section><DataInput /></section>
-          <section><ParameterPanel /></section>
-          <section><RefinementControl /></section>
-        </div>
-        <div class="right-panel">
-          <section class="plot-section">
-            <DiagramPlot />
-            <ResidualsPlot />
+          <section class="section-data">
+            <DataInput />
           </section>
-          <section><StatisticsPanel /></section>
-          <section><ReportPanel /></section>
+          <section class="section-params">
+            <ParameterPanel />
+          </section>
+          <section class="section-run">
+            <RefinementControl />
+          </section>
+        </div>
+
+        {/* ПРАВАЯ ПАНЕЛЬ */}
+        <div class="right-panel">
+          <div class="right-grid">
+            <div class="pane-diagram">
+              <DiagramPlot />
+            </div>
+            <div class="pane-residuals">
+              <ResidualsPlot />
+            </div>
+            <div class="pane-report">
+              <ReportPanel />
+            </div>
+          </div>
         </div>
       </main>
 
