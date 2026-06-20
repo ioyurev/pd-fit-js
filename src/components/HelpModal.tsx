@@ -1,6 +1,6 @@
 import { Show } from 'solid-js';
 import type { Component } from 'solid-js';
-import { Katex } from '../Katex';
+import { Katex } from '@/components/Katex';
 
 interface HelpModalProps {
   open: boolean;

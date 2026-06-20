@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { R, schroederRHS, liquidusResidualA } from './thermodynamics';
+import { R, schroederRHS, liquidusResidualA } from '@/lib/thermodynamics';
 
 describe('Thermodynamics Core', () => {
   it('calculates Schroeder-Le Chatelier RHS correctly', () => {

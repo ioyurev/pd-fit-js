@@ -3,37 +3,44 @@
   line-height: 1.5;
   font-weight: 400;
 
-  color-scheme: light dark;
-  color: #213547;
-  background-color: #ffffff;
-
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
-/* СБРОС БОКСОВОЙ МОДЕЛИ (Критично для layout без скроллов) */
-*, *::before, *::after {
-  box-sizing: border-box;
-}
-
-html, body {
-  margin: 0;
-  padding: 0;
-  width: 100vw;
-  height: 100vh;
-  overflow: hidden; /* Жестко отключаем скролл окна */
-}
-
-#root {
-  width: 100%;
-  height: 100%;
+  /* СВЕТЛАЯ ТЕМА (по умолчанию) */
+  --bg-app: #f0f2f5;
+  --bg-pane: #ffffff;
+  --text-main: #213547;
+  --text-muted: #888888;
+  --text-header: #ffffff;
+  --bg-header: #1e2d3d;
+  --border-color: #dde1e7;
+  --input-bg: #fafafa;
+  --input-border: #cccccc;
+  --table-header-bg: #f5f5f5;
+  --modal-overlay-bg: rgba(0, 0, 0, 0.45);
+  --log-bg: #f4f4f4;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    color: rgba(255, 255, 255, 0.87);
-    background-color: #242424;
+    --bg-app: #121212;
+    --bg-pane: #1e1e1e;
+    --text-main: #e0e0e0;
+    --text-muted: #aaaaaa;
+    --text-header: #ffffff;
+    --bg-header: #1a1a1a;
+    --border-color: #333333;
+    --input-bg: #2d2d2d;
+    --input-border: #444444;
+    --table-header-bg: #2a2d2e;
+    --modal-overlay-bg: rgba(0, 0, 0, 0.75);
+    --log-bg: #2d2d2d;
   }
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  color: var(--text-main);
+  background-color: var(--bg-app);
 }

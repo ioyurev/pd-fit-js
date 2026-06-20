@@ -1,5 +1,5 @@
 import type { Component } from 'solid-js';
-import { state, runRefinement } from '../../store/fitStore';
+import { state, runRefinement } from '@/store/fitStore';
 
 export const RefinementControl: Component = () => {
   return (
@@ -12,7 +12,7 @@ export const RefinementControl: Component = () => {
         onClick={runRefinement}
         disabled={state.isRunning || state.dataPoints.length === 0}
       >
-        {state.isRunning ? 'Выполняется...' : '▶ Запустить уточнение'}
+        {state.isRunning ? 'Выполняется...' : '\u25B6 Запустить уточнение'}
       </button>
     </div>
   );

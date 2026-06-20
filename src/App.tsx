@@ -1,41 +1,164 @@
 import type { Component } from 'solid-js';
-import { Show, createSignal } from 'solid-js';
-import { DataInput } from './components/DataInput';
-import { ParameterPanel } from './components/ParameterPanel';
-import { DiagramPlot } from './components/DiagramPlot';
-import { ResidualsPlot } from './components/ResidualsPlot';
-import { RefinementControl } from './components/RefinementControl';
-import { ReportPanel } from './components/ReportPanel';
-import { LogModal } from './components/LogModal';
-import { HelpModal } from './components/HelpModal';
-import { state } from './store/fitStore';
+import { Show, createSignal, onMount, onCleanup, createEffect } from 'solid-js';
+import { DataInput } from '@/components/DataInput';
+import { ParameterPanel } from '@/components/ParameterPanel';
+import { DiagramPlot } from '@/components/DiagramPlot';
+import { ResidualsPlot } from '@/components/ResidualsPlot';
+import { RefinementControl } from '@/components/RefinementControl';
+import { ReportPanel } from '@/components/ReportPanel';
+import { ToastContainer } from '@/components/ToastContainer';
+import { LLMPanel } from '@/components/LLMPanel';
+import { HelpModal } from '@/components/HelpModal';
+import { ProgressPlot } from '@/components/ProgressPlot';
+import { ConvergencePlot } from '@/components/ConvergencePlot';
+import { GExPlot } from '@/components/GExPlot';
+import { FileMenu } from '@/components/FileMenu';
+import { state } from '@/store/fitStore';
+import { windowTitle, isDirty } from '@/store/fileStore';
+import { hasFileSystemAccess } from '@/lib/projectFile';
 import './App.css';
 
 const App: Component = () => {
   const [helpOpen, setHelpOpen] = createSignal(false);
 
+  // ── Обновление заголовка окна ──
+  createEffect(() => {
+    document.title = windowTitle();
+  });
+
+  // ── Предупреждение при закрытии с несохранёнными изменениями ──
+  const beforeUnload = (e: BeforeUnloadEvent) => {
+    if (isDirty()) {
+      e.preventDefault();
+      e.returnValue = '';
+    }
+  };
+
+  onMount(() => {
+    window.addEventListener('beforeunload', beforeUnload);
+  });
+
+  onCleanup(() => {
+    window.removeEventListener('beforeunload', beforeUnload);
+  });
+
+  // ── Горячие клавиши ──
+  const handleKeyboard = (e: KeyboardEvent) => {
+    const ctrl = e.ctrlKey || e.metaKey;
+    if (!ctrl) return;
+
+    if (e.key === 's' && !e.shiftKey) {
+      e.preventDefault();
+      // Если FSA доступен → Сохранить, иначе → Скачать
+      if (hasFileSystemAccess()) {
+        document.dispatchEvent(new CustomEvent('pdfit:save'));
+      } else {
+        document.dispatchEvent(new CustomEvent('pdfit:download'));
+      }
+    } else if (e.key === 's' && e.shiftKey) {
+      e.preventDefault();
+      if (hasFileSystemAccess()) {
+        document.dispatchEvent(new CustomEvent('pdfit:save-as'));
+      } else {
+        document.dispatchEvent(new CustomEvent('pdfit:download'));
+      }
+    } else if (e.key === 'o') {
+      e.preventDefault();
+      document.dispatchEvent(new CustomEvent('pdfit:open'));
+    } else if (e.key === 'n') {
+      e.preventDefault();
+      document.dispatchEvent(new CustomEvent('pdfit:new'));
+    } else if (e.key === 'w') {
+      e.preventDefault();
+      document.dispatchEvent(new CustomEvent('pdfit:close'));
+    }
+  };
+
+  onMount(() => {
+    document.addEventListener('keydown', handleKeyboard);
+  });
+
+  onCleanup(() => {
+    document.removeEventListener('keydown', handleKeyboard);
+  });
+
   return (
     <div class="app-container">
       <Show when={state.isRunning}>
         <div class="loading-overlay">
-          <div class="spinner"></div>
-          <div>Выполняется расчёт...</div>
+          <div style="display: flex; align-items: center; gap: 1rem;">
+            <div class="spinner"></div>
+            <div style="font-size: 1.2rem; font-weight: 600;">Выполняется оптимизация...</div>
+          </div>
+
+          <Show when={state.progressHistory.length > 0}>
+            <div style="width: 90%; max-width: 800px; margin-top: 1rem;">
+              <div style="display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 4px;">
+                <span>Успешных шагов: {state.progressHistory[state.progressHistory.length - 1]?.step || 0}</span>
+                <span>Макс. итераций: 500</span>
+              </div>
+              <div style="width: 100%; height: 8px; background: var(--border-color); border-radius: 4px; overflow: hidden;">
+                <div
+                  style={{
+                    width: `${Math.min(100, ((state.progressHistory[state.progressHistory.length - 1]?.step || 0) / 500) * 100)}%`,
+                    height: '100%',
+                    background: '#2ecc71',
+                    transition: 'width 0.2s ease-out',
+                  }}
+                ></div>
+              </div>
+            </div>
+
+            <div style="display: flex; gap: 1rem; width: 90%; max-width: 1000px; margin-top: 0.5rem;">
+              <div style="flex: 1; min-width: 0;">
+                <ProgressPlot />
+              </div>
+              <div style="flex: 1; min-width: 0;">
+                <ConvergencePlot />
+              </div>
+            </div>
+          </Show>
         </div>
       </Show>
 
       <header>
-        <h1>PD-Fit JS</h1>
+        <div class="header-left">
+          <span style="font-weight: 700; letter-spacing: 0.02em;">PD-Fit JS</span>
+          <FileMenu />
+        </div>
         <div class="header-actions">
           <button class="btn-help" onClick={() => setHelpOpen(true)}>? Справка</button>
         </div>
       </header>
 
       <main>
-        {/* ЛЕВАЯ ПАНЕЛЬ */}
         <div class="left-panel">
           <section class="section-data">
             <DataInput />
           </section>
+          <section class="section-llm">
+            <LLMPanel />
+          </section>
+        </div>
+
+        <div class="center-panel">
+          <div class="center-grid">
+            <div class="pane-diagram">
+              <DiagramPlot />
+            </div>
+            <div class="pane-residuals">
+              <ResidualsPlot />
+            </div>
+            <div class="pane-gex">
+              <GExPlot />
+            </div>
+            <div class="pane-report">
+              <ReportPanel />
+            </div>
+          </div>
+        </div>
+
+        <div class="right-panel">
           <section class="section-params">
             <ParameterPanel />
           </section>
@@ -43,24 +166,9 @@ const App: Component = () => {
             <RefinementControl />
           </section>
         </div>
-
-        {/* ПРАВАЯ ПАНЕЛЬ */}
-        <div class="right-panel">
-          <div class="right-grid">
-            <div class="pane-diagram">
-              <DiagramPlot />
-            </div>
-            <div class="pane-residuals">
-              <ResidualsPlot />
-            </div>
-            <div class="pane-report">
-              <ReportPanel />
-            </div>
-          </div>
-        </div>
       </main>
 
-      <LogModal />
+      <ToastContainer />
       <HelpModal open={helpOpen()} onClose={() => setHelpOpen(false)} />
     </div>
   );
