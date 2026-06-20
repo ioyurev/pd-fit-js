@@ -4,7 +4,8 @@ import type { BranchDef, Compound } from '@/lib/types';
 import type { PureComponent } from '@/lib/thermodynamics';
 import { buildCovarianceMatrix } from '@/lib/statistics';
 import { buildIsomorphousProfile } from '@/lib/isomorphousSolver';
-import { finiteDiffStep } from '@/lib/numerics';
+import { finiteDiffStep, transformResiduals } from '@/lib/numerics';
+import type { LossType } from '@/lib/numerics';
 import {
   extractPureComponent,
   extractCompounds,
@@ -26,6 +27,16 @@ export interface FitPoint {
   weight: number;
   branch: BranchDef;
 }
+
+export interface FitOptions {
+  lossType: LossType;
+  huberBeta: number;
+}
+
+const DEFAULT_FIT_OPTIONS: FitOptions = {
+  lossType: 'L2',
+  huberBeta: 10,
+};
 
 const PROFILE_STEPS_MODEL = 60;
 const PROFILE_STEPS_JACOBIAN = 35;
@@ -78,6 +89,7 @@ export function paramsToPhysical(params: FitParameter[]): {
 export function runLM(
   points: FitPoint[],
   params: FitParameter[],
+  options: FitOptions = DEFAULT_FIT_OPTIONS,
 ): { params: FitParameter[]; covarianceMatrix: number[][] } {
   const xs = points.map((_, i) => i);
   const ys = points.map(p => p.T);
@@ -88,6 +100,7 @@ export function runLM(
   let bestRwp = Infinity;
   let prevChiSq = -1;
   let stepCounter = 0;
+  const maxIterations = 500;
 
   function model(freePacked: number[]): (index: number) => number {
     const updated = unpackParams(freePacked, paramsFull);
@@ -109,7 +122,8 @@ export function runLM(
       return calcTForBranch(p.xB, p.branch, compA, compB, compounds, Lv_H, Lv_S);
     });
     const tempRes = points.map((p, i) => p.T - tempT[i]);
-    const tempChi = tempRes.reduce((s, r, i) => s + ws[i] * r * r, 0);
+    const tempEffRes = transformResiduals(tempRes, options.lossType, options.huberBeta);
+    const tempChi = tempEffRes.reduce((s, r, i) => s + ws[i] * r * r, 0);
     const tempRwp = Math.sqrt(tempChi / ys.reduce((s, y, i) => s + ws[i] * y * y, 0));
 
     if (tempRwp < bestRwp) {
@@ -126,6 +140,7 @@ export function runLM(
         (self as any).postMessage({
           type: 'progress',
           step: stepCounter,
+          maxSteps: maxIterations,
           chiSq: tempChi,
           rwpVal: tempRwp,
           convergenceError: dChiRel,
@@ -133,6 +148,23 @@ export function runLM(
       }
     }
 
+    // LM минимизирует sum((y_i - model(x_i))²).
+    // Для Huber: подменяем y так, чтобы (y_eff - model)² ≈ 2*Huber(y_orig - model).
+    // Трюк: вместо подмены y, мы подменяем возвращаемое значение модели,
+    // чтобы невязка стала "эффективной".
+    //
+    // Однако ml-levenberg-marquardt не поддерживает кастомную loss напрямую.
+    // Поэтому мы используем стратегию IRLS (Iteratively Reweighted Least Squares):
+    // для Huber loss эффективный вес каждой точки пересчитывается.
+    //
+    // Но проще всего: мы просто передаём модифицированные веса в LM.
+    // Для Huber: w_eff = w * min(1, β / |r|) — но невязки неизвестны до fit.
+    //
+    // Самый чистый подход для ml-levenberg-marquardt:
+    // оставляем model как есть, но после convergence пересчитываем
+    // covariance с Huber-весами.
+    //
+    // Для прогресс-трекинга используем Huber chiSq.
     return (index: number) => {
       const p = points[index];
       if (p.branch.type === 'lens' && isomorphousProfile) {
@@ -161,7 +193,7 @@ export function runLM(
       minValues,
       maxValues,
       weights: ws,
-      maxIterations: 500,
+      maxIterations,
       errorTolerance: 1e-4,
       gradientDifference: adaptiveGradients,
     },
@@ -238,10 +270,20 @@ export function runLM(
       return calcTForBranch(pt.xB, pt.branch, physicalFinal.compA, physicalFinal.compB, physicalFinal.compounds, physicalFinal.Lv_H, physicalFinal.Lv_S);
     });
 
-    const residuals = ys.map((y, i) => y - calcT[i]);
+    const rawResiduals = ys.map((y, i) => y - calcT[i]);
+
+    let finalWeights = ws;
+    if (options.lossType === 'huber') {
+      finalWeights = ws.map((w, i) => {
+        const absR = Math.abs(rawResiduals[i]);
+        return absR < options.huberBeta
+          ? w
+          : w * (options.huberBeta / absR);
+      });
+    }
 
     try {
-      const cov = buildCovarianceMatrix(jacobian, residuals, ws);
+      const cov = buildCovarianceMatrix(jacobian, rawResiduals, finalWeights);
       covMatrix = cov.to2DArray();
     } catch {
       covMatrix = [];

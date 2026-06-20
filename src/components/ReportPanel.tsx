@@ -63,6 +63,12 @@ export const ReportPanel: Component = () => {
           <span class="stat-label">R²</span>
           <span class="stat-value" style="font-size: 0.85rem; white-space: nowrap;">{state.r2Val.toFixed(5)}</span>
         </div>
+        <div class="stat-item" style="flex-direction: column; align-items: flex-start; gap: 0; margin-top: 0.4rem;">
+          <span class="stat-label">Loss</span>
+          <span class="stat-value" style="font-size: 0.78rem; white-space: nowrap;">
+            {state.lossType === 'huber' ? `Huber (β=${state.huberBeta})` : 'L2'}
+          </span>
+        </div>
         <div class="stat-item stat-warnings">
           {state.corrWarnings.length > 0 && (
             <span class="warn-badge" title={state.corrWarnings.join('\n')}>

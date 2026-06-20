@@ -1,4 +1,6 @@
 import { Matrix, inverse } from 'ml-matrix';
+import { finiteDiffStep, weightedLossSum } from '@/lib/numerics';
+import type { LossType } from '@/lib/numerics';
 
 export function buildCovarianceMatrix(
   jacobian: number[][],
@@ -46,12 +48,23 @@ export function correlationMatrix(cov: Matrix): Matrix {
   return corr;
 }
 
-export function chiSquared(residuals: number[], weights: number[]): number {
-  return residuals.reduce((s, r, i) => s + weights[i] * r * r, 0);
+export function chiSquared(
+  residuals: number[],
+  weights: number[],
+  lossType: LossType = 'L2',
+  huberBeta = 10,
+): number {
+  return weightedLossSum(residuals, weights, lossType, huberBeta);
 }
 
-export function rwp(residuals: number[], weights: number[], observed: number[]): number {
-  const num = chiSquared(residuals, weights);
+export function rwp(
+  residuals: number[],
+  weights: number[],
+  observed: number[],
+  lossType: LossType = 'L2',
+  huberBeta = 10,
+): number {
+  const num = chiSquared(residuals, weights, lossType, huberBeta);
   const den = observed.reduce((s, y, i) => s + weights[i] * y * y, 0);
   return Math.sqrt(num / den);
 }

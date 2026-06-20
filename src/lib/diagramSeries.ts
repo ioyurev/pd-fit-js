@@ -6,6 +6,7 @@
 import type { FitParameter } from '@/lib/fitAdapter';
 import { paramsToPhysical } from '@/lib/fitAdapter';
 import { buildGlobalLiquidusProfile, findInvariantPoint } from '@/lib/liquidusSolver';
+import type { LiquidusProfilePoint } from '@/lib/liquidusSolver';
 import { buildIsomorphousProfile } from '@/lib/isomorphousSolver';
 import { encodeBranch } from '@/lib/types';
 import type { BranchDef } from '@/lib/types';
@@ -17,6 +18,62 @@ interface DataPoint {
   T: number;
   sigma: number;
   branch: BranchDef;
+}
+
+/**
+ * Находит состав xB, при котором ликвидус фазы phaseId пересекает температуру T_target.
+ * Использует линейную интерполяцию между соседними точками профиля.
+ *
+ * Для компонента A: ищем слева направо, ликвидус падает → ищем переход T >= T_target → T < T_target.
+ * Для компонента B: ищем справа налево, ликвидус падает → ищем переход T >= T_target → T < T_target.
+ *
+ * Возвращает null если пересечение не найдено (переход выше или ниже всей ветви).
+ */
+function findTransitionIntersection(
+  profile: LiquidusProfilePoint[],
+  phaseId: string,
+  T_target: number,
+  fromRight: boolean,
+): number | null {
+  if (fromRight) {
+    for (let i = profile.length - 1; i > 0; i--) {
+      const cur = profile[i];
+      const prev = profile[i - 1];
+
+      if (cur.phaseId !== phaseId && prev.phaseId !== phaseId) continue;
+
+      if (cur.T >= T_target && prev.T < T_target) {
+        const t1 = cur.T, x1 = cur.xB;
+        const t2 = prev.T, x2 = prev.xB;
+        return x1 + (T_target - t1) * (x2 - x1) / (t2 - t1);
+      }
+      if (prev.T >= T_target && cur.T < T_target) {
+        const t1 = prev.T, x1 = prev.xB;
+        const t2 = cur.T, x2 = cur.xB;
+        return x1 + (T_target - t1) * (x2 - x1) / (t2 - t1);
+      }
+    }
+  } else {
+    for (let i = 0; i < profile.length - 1; i++) {
+      const cur = profile[i];
+      const next = profile[i + 1];
+
+      if (cur.phaseId !== phaseId && next.phaseId !== phaseId) continue;
+
+      if (cur.T >= T_target && next.T < T_target) {
+        const t1 = cur.T, x1 = cur.xB;
+        const t2 = next.T, x2 = next.xB;
+        return x1 + (T_target - t1) * (x2 - x1) / (t2 - t1);
+      }
+      if (next.T >= T_target && cur.T < T_target) {
+        const t1 = next.T, x1 = next.xB;
+        const t2 = cur.T, x2 = cur.xB;
+        return x1 + (T_target - t1) * (x2 - x1) / (t2 - t1);
+      }
+    }
+  }
+
+  return null;
 }
 
 export function buildDiagramDatasets(
@@ -134,21 +191,29 @@ export function buildDiagramDatasets(
 
   for (const trans of compA.transitions) {
     if (trans.T <= 0) continue;
+
+    const xIntersect = findTransitionIntersection(profile, 'A', trans.T, false);
+    const xEnd = xIntersect ?? 0.5;
+
     transitionDatasets.push({
       label: `Переход ${compAName} (${trans.T.toFixed(0)} K)`,
-      data: [{ x: 0, y: trans.T }, { x: 0.5, y: trans.T }],
-      borderColor: 'rgba(54, 162, 235, 0.5)', borderWidth: 1,
-      borderDash: [3, 3], pointRadius: 0, fill: false, type: 'line' as const,
+      data: [{ x: 0, y: trans.T }, { x: xEnd, y: trans.T }],
+      borderColor: 'rgba(54, 162, 235, 0.5)', borderWidth: 1.5,
+      borderDash: [5, 3], pointRadius: 0, fill: false, type: 'line' as const,
     });
   }
 
   for (const trans of compB.transitions) {
     if (trans.T <= 0) continue;
+
+    const xIntersect = findTransitionIntersection(profile, 'B', trans.T, true);
+    const xStart = xIntersect ?? 0.5;
+
     transitionDatasets.push({
       label: `Переход ${compBName} (${trans.T.toFixed(0)} K)`,
-      data: [{ x: 0.5, y: trans.T }, { x: 1, y: trans.T }],
-      borderColor: 'rgba(75, 192, 192, 0.5)', borderWidth: 1,
-      borderDash: [3, 3], pointRadius: 0, fill: false, type: 'line' as const,
+      data: [{ x: xStart, y: trans.T }, { x: 1, y: trans.T }],
+      borderColor: 'rgba(75, 192, 192, 0.5)', borderWidth: 1.5,
+      borderDash: [5, 3], pointRadius: 0, fill: false, type: 'line' as const,
     });
   }
 

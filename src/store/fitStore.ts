@@ -5,6 +5,8 @@ import { paramsToPhysical } from '@/lib/fitAdapter';
 import type { FitParameter, FitPoint } from '@/lib/fitAdapter';
 import { calcAllTLiquidus } from '@/lib/liquidusSolver';
 import { chiSquared, rwp, correlationMatrix, highCorrelationWarnings } from '@/lib/statistics';
+import type { LossType } from '@/lib/numerics';
+import type { FitOptions } from '@/lib/fitAdapter';
 import type { BranchDef } from '@/lib/types';
 import { addToast } from './toastStore';
 import { loadPersistedState, debouncedSyncToURL } from './fitPersistence';
@@ -34,6 +36,8 @@ export interface DataPoint {
 
 interface FitState {
   systemType: 'eutectic' | 'isomorphous';
+  lossType: LossType;
+  huberBeta: number;
   dataPoints: DataPoint[];
   parameters: FitParameter[];
   calcT: number[];
@@ -51,7 +55,7 @@ interface FitState {
   prevParameters: FitParameter[] | null;
   prevChiSq: number | null;
   prevRwpVal: number | null;
-  progressHistory: { step: number; rwpVal: number; chiSq: number; convergenceError: number }[];
+  progressHistory: { step: number; maxSteps: number; rwpVal: number; chiSq: number; convergenceError: number }[];
 }
 
 const savedState = loadPersistedState();
@@ -60,6 +64,8 @@ const defaultSystemType = savedState?.systemType ?? 'eutectic';
 
 const [state, setState] = createStore<FitState>({
   systemType: defaultSystemType,
+  lossType: (savedState?.lossType as LossType) ?? 'L2',
+  huberBeta: savedState?.huberBeta ?? 10,
   dataPoints: savedState?.dataPoints ?? [],
   parameters: savedState?.parameters ?? createDefaultParameters(defaultSystemType),
   compAName: savedState?.compAName ?? 'A',
@@ -84,6 +90,8 @@ const [state, setState] = createStore<FitState>({
 createEffect(() => {
   debouncedSyncToURL({
     systemType: state.systemType,
+    lossType: state.lossType,
+    huberBeta: state.huberBeta,
     compAName: state.compAName,
     compBName: state.compBName,
     dataPoints: state.dataPoints,
@@ -98,6 +106,8 @@ createEffect(() => {
  */
 export function loadProject(data: {
   systemType: SystemType;
+  lossType?: LossType;
+  huberBeta?: number;
   compAName: string;
   compBName: string;
   parameters: FitParameter[];
@@ -105,6 +115,8 @@ export function loadProject(data: {
 }) {
   setState({
     systemType: data.systemType,
+    lossType: data.lossType ?? 'L2',
+    huberBeta: data.huberBeta ?? 10,
     compAName: data.compAName,
     compBName: data.compBName,
     parameters: data.parameters,
@@ -197,6 +209,21 @@ export function setSystemType(type: SystemType) {
     parameters: createDefaultParameters(type),
     dataPoints: [],
   });
+  invalidateFitArtifacts();
+  recalculate();
+  markDirty();
+}
+
+export function setLossType(type: LossType) {
+  setState('lossType', type);
+  invalidateFitArtifacts();
+  recalculate();
+  markDirty();
+}
+
+export function setHuberBeta(beta: number) {
+  if (!Number.isFinite(beta) || beta <= 0) return;
+  setState('huberBeta', beta);
   invalidateFitArtifacts();
   recalculate();
   markDirty();
@@ -328,8 +355,8 @@ export function recalculate() {
   setState({
     calcT,
     residuals: res,
-    chiSq: chiSquared(res, ws),
-    rwpVal: rwp(res, ws, obs),
+    chiSq: chiSquared(res, ws, state.lossType, state.huberBeta),
+    rwpVal: rwp(res, ws, obs, state.lossType, state.huberBeta),
     rmseVal: rmse,
     r2Val: r2,
   });
@@ -378,7 +405,13 @@ export async function runRefinement() {
         if (e.data.type === 'progress') {
           setState('progressHistory', h => [
             ...h,
-            { step: e.data.step, rwpVal: e.data.rwpVal, chiSq: e.data.chiSq, convergenceError: e.data.convergenceError }
+            {
+              step: e.data.step,
+              maxSteps: e.data.maxSteps,
+              rwpVal: e.data.rwpVal,
+              chiSq: e.data.chiSq,
+              convergenceError: e.data.convergenceError,
+            },
           ]);
           return;
         }
@@ -403,7 +436,11 @@ export async function runRefinement() {
         worker.terminate();
       };
 
-      worker.postMessage({ points: rawDataPoints, parameters: rawParameters });
+      const fitOptions: FitOptions = {
+        lossType: state.lossType,
+        huberBeta: state.huberBeta,
+      };
+      worker.postMessage({ points: rawDataPoints, parameters: rawParameters, options: fitOptions });
     });
 
     const { params: finalParams, covarianceMatrix } = workerResult;

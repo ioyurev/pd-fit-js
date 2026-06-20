@@ -21,6 +21,8 @@ export function loadPersistedState(): any | null {
 export interface PersistableState {
   version: number;
   systemType: string;
+  lossType?: string;
+  huberBeta?: number;
   compAName: string;
   compBName: string;
   dataPoints: any[];

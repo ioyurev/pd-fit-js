@@ -92,22 +92,31 @@ const App: Component = () => {
           </div>
 
           <Show when={state.progressHistory.length > 0}>
-            <div style="width: 90%; max-width: 800px; margin-top: 1rem;">
-              <div style="display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 4px;">
-                <span>Успешных шагов: {state.progressHistory[state.progressHistory.length - 1]?.step || 0}</span>
-                <span>Макс. итераций: 500</span>
-              </div>
-              <div style="width: 100%; height: 8px; background: var(--border-color); border-radius: 4px; overflow: hidden;">
-                <div
-                  style={{
-                    width: `${Math.min(100, ((state.progressHistory[state.progressHistory.length - 1]?.step || 0) / 500) * 100)}%`,
-                    height: '100%',
-                    background: '#2ecc71',
-                    transition: 'width 0.2s ease-out',
-                  }}
-                ></div>
-              </div>
-            </div>
+            {(() => {
+              const last = () => state.progressHistory[state.progressHistory.length - 1];
+              const currentStep = () => last()?.step ?? 0;
+              const maxSteps = () => last()?.maxSteps ?? 500;
+              const pct = () => Math.min(100, (currentStep() / maxSteps()) * 100);
+
+              return (
+                <div style="width: 90%; max-width: 800px; margin-top: 1rem;">
+                  <div style="display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 4px;">
+                    <span>Успешных шагов: {currentStep()}</span>
+                    <span>Макс. итераций: {maxSteps()}</span>
+                  </div>
+                  <div style="width: 100%; height: 8px; background: var(--border-color); border-radius: 4px; overflow: hidden;">
+                    <div
+                      style={{
+                        width: `${pct()}%`,
+                        height: '100%',
+                        background: '#2ecc71',
+                        transition: 'width 0.2s ease-out',
+                      }}
+                    ></div>
+                  </div>
+                </div>
+              );
+            })()}
 
             <div style="display: flex; gap: 1rem; width: 90%; max-width: 1000px; margin-top: 0.5rem;">
               <div style="flex: 1; min-width: 0;">

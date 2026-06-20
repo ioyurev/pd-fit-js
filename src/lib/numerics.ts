@@ -80,3 +80,52 @@ export function safeDivide(num: number, den: number): number {
   const result = num / den;
   return Number.isFinite(result) ? result : NaN;
 }
+
+// ─── Loss Functions ──────────────────────────────────────────────────────────
+
+export type LossType = 'L2' | 'huber';
+
+export function huberLoss(residual: number, beta: number): number {
+  const absR = Math.abs(residual);
+  if (absR < beta) {
+    return 0.5 * residual * residual / beta;
+  }
+  return absR - 0.5 * beta;
+}
+
+export function huberEffectiveResidual(residual: number, beta: number): number {
+  const absR = Math.abs(residual);
+  if (absR < beta) {
+    return residual / Math.sqrt(beta);
+  }
+  const sign = residual >= 0 ? 1 : -1;
+  return sign * Math.sqrt(2 * (absR - 0.5 * beta));
+}
+
+export function weightedLossSum(
+  residuals: number[],
+  weights: number[],
+  lossType: LossType,
+  huberBeta: number,
+): number {
+  let sum = 0;
+  for (let i = 0; i < residuals.length; i++) {
+    const w = weights[i];
+    const r = residuals[i];
+    if (lossType === 'huber') {
+      sum += w * 2 * huberLoss(r, huberBeta);
+    } else {
+      sum += w * r * r;
+    }
+  }
+  return sum;
+}
+
+export function transformResiduals(
+  residuals: number[],
+  lossType: LossType,
+  huberBeta: number,
+): number[] {
+  if (lossType === 'L2') return residuals;
+  return residuals.map(r => huberEffectiveResidual(r, huberBeta));
+}

@@ -23,6 +23,8 @@ export interface ProjectDataPoint {
 export interface ProjectFile {
   version: number;
   systemType: SystemType;
+  lossType?: string;
+  huberBeta?: number;
   compAName: string;
   compBName: string;
   parameters: FitParameter[];
@@ -33,6 +35,8 @@ export interface ProjectFile {
 
 export function serializeProject(data: {
   systemType: SystemType;
+  lossType?: string;
+  huberBeta?: number;
   compAName: string;
   compBName: string;
   parameters: FitParameter[];
@@ -41,6 +45,8 @@ export function serializeProject(data: {
   const project: ProjectFile = {
     version: CURRENT_VERSION,
     systemType: data.systemType,
+    lossType: data.lossType ?? 'L2',
+    huberBeta: data.huberBeta ?? 10,
     compAName: data.compAName,
     compBName: data.compBName,
     parameters: data.parameters.map(p => ({
@@ -101,6 +107,8 @@ export function deserializeProject(json: string): ProjectFile {
   return {
     version: CURRENT_VERSION,
     systemType: migrated.systemType ?? 'eutectic',
+    lossType: migrated.lossType ?? 'L2',
+    huberBeta: migrated.huberBeta ?? 10,
     compAName: migrated.compAName ?? 'A',
     compBName: migrated.compBName ?? 'B',
     parameters,

@@ -1,10 +1,10 @@
 import { runLM } from '@/lib/fitAdapter';
-import type { FitPoint, FitParameter } from '@/lib/fitAdapter';
+import type { FitPoint, FitParameter, FitOptions } from '@/lib/fitAdapter';
 
-self.onmessage = (e: MessageEvent<{ points: FitPoint[], parameters: FitParameter[] }>) => {
+self.onmessage = (e: MessageEvent<{ points: FitPoint[], parameters: FitParameter[], options?: FitOptions }>) => {
   try {
-    const { points, parameters } = e.data;
-    const result = runLM(points, parameters);
+    const { points, parameters, options } = e.data;
+    const result = runLM(points, parameters, options);
     self.postMessage({ success: true, result });
   } catch (error: any) {
     // 1. Выводим ошибку в консоль прямо из Воркера.

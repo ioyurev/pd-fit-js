@@ -63,6 +63,8 @@ export const FileMenu: Component = () => {
   const getProjectContent = () =>
     serializeProject({
       systemType: state.systemType,
+      lossType: state.lossType,
+      huberBeta: state.huberBeta,
       compAName: state.compAName,
       compBName: state.compBName,
       parameters: unwrap(state.parameters),
@@ -98,6 +100,8 @@ export const FileMenu: Component = () => {
 
       loadProject({
         systemType: project.systemType,
+        lossType: project.lossType as any,
+        huberBeta: project.huberBeta,
         compAName: project.compAName,
         compBName: project.compBName,
         parameters: project.parameters,
