@@ -232,10 +232,12 @@ export function buildGlobalLiquidusProfile(
       })),
     ];
 
-    // Стабильная фаза — максимум температуры ликвидуса
-    const stable = candidates.reduce((best, cur) =>
-      isFinite(cur.T) && cur.T > best.T ? cur : best,
-    );
+    // Стабильная фаза — максимум температуры ликвидуса, устойчивый к NaN значениям
+    const stable = candidates.reduce((best, cur) => {
+      if (!Number.isFinite(best.T)) return cur;
+      if (!Number.isFinite(cur.T)) return best;
+      return cur.T > best.T ? cur : best;
+    });
 
     profile.push({ xB, T: stable.T, phaseId: stable.id });
   }
