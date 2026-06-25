@@ -25,6 +25,7 @@ export interface PersistableState {
   huberBeta?: number;
   compAName: string;
   compBName: string;
+  compoundNames?: Record<string, string>;
   dataPoints: any[];
   parameters: FitParameter[];
 }

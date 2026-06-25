@@ -3,11 +3,12 @@ import type { Component } from 'solid-js';
 import { state } from '@/store/fitStore';
 import { addToast } from '@/store/toastStore';
 import { formatLLMText } from '@/lib/llmExport';
+import { tempUnit } from '@/store/unitsStore';
 
 export const LLMPanel: Component = () => {
   const formattedText = createMemo(() => {
     const { dataPoints, parameters, chiSq, rwpVal, corrWarnings } = state;
-    return formatLLMText(dataPoints, parameters, chiSq, rwpVal, corrWarnings);
+    return formatLLMText(dataPoints, parameters, chiSq, rwpVal, corrWarnings, tempUnit());
   });
 
   const handleCopy = () => {

@@ -1,5 +1,5 @@
 import { Matrix, inverse } from 'ml-matrix';
-import { finiteDiffStep, weightedLossSum } from '@/lib/numerics';
+import { weightedLossSum } from '@/lib/numerics';
 import type { LossType } from '@/lib/numerics';
 
 export function buildCovarianceMatrix(

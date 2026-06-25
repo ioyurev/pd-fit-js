@@ -1,6 +1,7 @@
 import type { PureComponent } from '@/lib/thermodynamics';
 import { schroederRHS } from '@/lib/thermodynamics';
 import { lnGammaA, lnGammaB } from '@/lib/redlichKister';
+import { findSignChangeBracket, bisectBracketed } from '@/lib/numerics';
 
 /**
  * Вычисляет температурно-зависимые параметры взаимодействия Редлиха-Кистера:
@@ -101,62 +102,6 @@ export class CubicSpline {
       this.d[idx] * dx * dx * dx
     );
   }
-}
-
-function findSignChangeBracket(
-  f: (x: number) => number,
-  left: number,
-  right: number,
-  slices = 48,
-): [number, number] | null {
-  let prevX = left;
-  let prevF = f(prevX);
-
-  for (let i = 1; i <= slices; i++) {
-    const x = left + ((right - left) * i) / slices;
-    const fx = f(x);
-
-    if (Number.isFinite(prevF) && Number.isFinite(fx) && prevF * fx <= 0) {
-      return [prevX, x];
-    }
-
-    prevX = x;
-    prevF = fx;
-  }
-
-  return null;
-}
-
-function bisectBracketed(
-  f: (x: number) => number,
-  left: number,
-  right: number,
-  iterations = 40,
-): number {
-  let fLeft = f(left);
-  let fRight = f(right);
-
-  if (!Number.isFinite(fLeft) || !Number.isFinite(fRight) || fLeft * fRight > 0) {
-    return NaN;
-  }
-
-  for (let iter = 0; iter < iterations; iter++) {
-    const mid = (left + right) / 2;
-    const fMid = f(mid);
-
-    if (!Number.isFinite(fMid)) return NaN;
-    if (Math.abs(fMid) < 1e-12) return mid;
-
-    if (fLeft * fMid <= 0) {
-      right = mid;
-      fRight = fMid;
-    } else {
-      left = mid;
-      fLeft = fMid;
-    }
-  }
-
-  return (left + right) / 2;
 }
 
 /**

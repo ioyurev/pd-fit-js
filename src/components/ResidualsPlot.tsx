@@ -5,6 +5,8 @@ import { Scatter } from 'solid-chartjs';
 import { state } from '@/store/fitStore';
 import { isDark } from '@/store/themeStore';
 import { getChartTheme } from '@/lib/chartTheme';
+import { tempUnit } from '@/store/unitsStore';
+import { unitLabel } from '@/lib/temperatureUnits';
 
 Chart.register(Title, Tooltip, Legend, Colors);
 
@@ -17,7 +19,7 @@ export const ResidualsPlot: Component = () => {
 
     let resIdx = 0;
     for (const p of dataPoints) {
-      if (p.branch.type === 'invariant') continue;
+      // Итератор массива residuals теперь синхронизирован со всеми точками
       const r = residuals[resIdx++] ?? 0;
 
       if (p.branch.type === 'pure' && p.branch.comp === 'A') ptsA.push({ x: p.xB, y: r });
@@ -40,7 +42,7 @@ export const ResidualsPlot: Component = () => {
           type: 'scatter' as const,
         },
         {
-          label: 'Соед./переходы',
+          label: 'Соед./переходы/инв.',
           data: ptsC,
           backgroundColor: 'rgba(155, 89, 182, 1)',
           type: 'scatter' as const,
@@ -91,7 +93,7 @@ export const ResidualsPlot: Component = () => {
       plugins: { legend: { display: false } },
       scales: {
         x: { title: { display: true, text: `x(${state.compBName})`, color: textColor }, min: 0, max: 1, grid: { color: gridColor }, ticks: { color: textColor } },
-        y: { title: { display: true, text: 'ΔT (K)', color: textColor }, grid: { color: gridColor }, ticks: { color: textColor } },
+        y: { title: { display: true, text: `ΔT (${unitLabel(tempUnit())})`, color: textColor }, grid: { color: gridColor }, ticks: { color: textColor } },
       },
     };
   });

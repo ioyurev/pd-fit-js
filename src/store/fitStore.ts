@@ -7,6 +7,7 @@ import { calcAllTLiquidus } from '@/lib/liquidusSolver';
 import { chiSquared, rwp, correlationMatrix, highCorrelationWarnings } from '@/lib/statistics';
 import type { LossType } from '@/lib/numerics';
 import type { FitOptions } from '@/lib/fitAdapter';
+import { encodeBranch } from '@/lib/types';
 import type { BranchDef } from '@/lib/types';
 import { addToast } from './toastStore';
 import { loadPersistedState, debouncedSyncToURL } from './fitPersistence';
@@ -51,11 +52,20 @@ interface FitState {
   corrWarnings: string[];
   compAName: string;
   compBName: string;
+  compoundNames: Record<string, string>;
   isRunning: boolean;
   prevParameters: FitParameter[] | null;
   prevChiSq: number | null;
   prevRwpVal: number | null;
-  progressHistory: { step: number; maxSteps: number; rwpVal: number; chiSq: number; convergenceError: number }[];
+  progressHistory: {
+    step: number;
+    maxSteps: number;
+    modelEvalCount: number;
+    maxModelEvaluations: number;
+    rwpVal: number;
+    chiSq: number;
+    convergenceError: number;
+  }[];
 }
 
 const savedState = loadPersistedState();
@@ -70,6 +80,7 @@ const [state, setState] = createStore<FitState>({
   parameters: savedState?.parameters ?? createDefaultParameters(defaultSystemType),
   compAName: savedState?.compAName ?? 'A',
   compBName: savedState?.compBName ?? 'B',
+  compoundNames: savedState?.compoundNames ?? {},
   calcT: [],
   residuals: [],
   chiSq: 0,
@@ -94,6 +105,7 @@ createEffect(() => {
     huberBeta: state.huberBeta,
     compAName: state.compAName,
     compBName: state.compBName,
+    compoundNames: state.compoundNames,
     dataPoints: state.dataPoints,
     parameters: state.parameters,
   });
@@ -110,6 +122,7 @@ export function loadProject(data: {
   huberBeta?: number;
   compAName: string;
   compBName: string;
+  compoundNames?: Record<string, string>;
   parameters: FitParameter[];
   dataPoints: DataPoint[];
 }) {
@@ -119,6 +132,7 @@ export function loadProject(data: {
     huberBeta: data.huberBeta ?? 10,
     compAName: data.compAName,
     compBName: data.compBName,
+    compoundNames: data.compoundNames ?? {},
     parameters: data.parameters,
     dataPoints: data.dataPoints,
     calcT: [],
@@ -155,10 +169,23 @@ export function addDataPoint() {
     state.systemType === 'isomorphous'
       ? { type: 'lens', curve: 'liquidus' }
       : { type: 'pure', comp: 'A' };
+  addDataPointWithBranch(branch);
+}
+
+export function addDataPointWithBranch(branch: BranchDef) {
   setState('dataPoints', pts => [
     ...pts,
     { xB: 0.5, T: 500, sigma: 1, branch },
   ]);
+  invalidateFitArtifacts();
+  recalculate();
+  markDirty();
+}
+
+export function removeDataPointsByBranch(branchKey: string) {
+  setState('dataPoints', pts =>
+    pts.filter(p => encodeBranch(p.branch) !== branchKey),
+  );
   invalidateFitArtifacts();
   recalculate();
   markDirty();
@@ -279,6 +306,7 @@ export function addCompound() {
   const existing = state.parameters.filter(p => p.name.match(/^Tfus_C\d+$/));
   const id = `C${existing.length + 1}`;
   setState('parameters', ps => [...ps, ...createCompoundParams(id)]);
+  setState('compoundNames', id, id);
   invalidateFitArtifacts();
   markDirty();
 }
@@ -292,6 +320,7 @@ export function removeCompound() {
   setState('dataPoints', pts =>
     pts.filter(p => !(p.branch.type === 'compound' && p.branch.id === lastId)),
   );
+  setState('compoundNames', produce(names => { delete names[lastId]; }));
   invalidateFitArtifacts();
   recalculate();
   markDirty();
@@ -301,6 +330,11 @@ export function setComponentName(comp: 'A' | 'B', name: string) {
   if (comp === 'A') setState('compAName', name);
   else setState('compBName', name);
   invalidateFitArtifacts();
+  markDirty();
+}
+
+export function setCompoundName(id: string, name: string) {
+  setState('compoundNames', id, name);
   markDirty();
 }
 
@@ -324,7 +358,7 @@ export function recalculate() {
   }
 
   const { compA, compB, compounds, Lv_H, Lv_S, Lv_H_sol, Lv_S_sol } = paramsToPhysical(parameters);
-  const pts = dataPoints.filter(p => p.branch.type !== 'invariant');
+  const pts = dataPoints; // Убран фильтр: инварианты теперь участвуют в расчёте метрик
 
   if (pts.length === 0) {
     setState({
@@ -364,13 +398,44 @@ export function recalculate() {
 
 // ─── Уточнение ───────────────────────────────────────────────────────────────
 
+let activeWorker: Worker | null = null;
+let lastBestWorkerParams: FitParameter[] | null = null;
+
+export function stopRefinement() {
+  if (!activeWorker || !state.isRunning) return;
+
+  activeWorker.terminate();
+  activeWorker = null;
+
+  if (lastBestWorkerParams) {
+    setState('parameters', lastBestWorkerParams);
+    recalculate();
+    markDirty();
+
+    const dChiSq = state.prevChiSq !== null ? state.chiSq - state.prevChiSq : 0;
+    addToast(
+      `Оптимизация остановлена.\n` +
+      `Применены лучшие найденные параметры.\n` +
+      `• χ²: ${state.chiSq.toFixed(4)} (Δ: ${dChiSq >= 0 ? '+' : ''}${dChiSq.toFixed(4)})\n` +
+      `• Rwp: ${(state.rwpVal * 100).toFixed(4)}%`,
+      'warning',
+      8000,
+    );
+  } else {
+    addToast('Оптимизация остановлена. Параметры не обновлены.', 'info', 3000);
+  }
+
+  lastBestWorkerParams = null;
+  setState({ isRunning: false });
+}
+
 export async function runRefinement() {
   setState({ isRunning: true });
   addToast('Запуск уточнения...', 'info', 2000);
 
   try {
     const rawDataPoints = unwrap(state.dataPoints)
-      .filter(p => p.branch.type !== 'invariant')
+      // Убран фильтр: инварианты отправляются в LM-оптимизатор
       .map(p => ({
         xB: p.xB,
         T: p.T,
@@ -379,7 +444,7 @@ export async function runRefinement() {
       })) as FitPoint[];
 
     if (rawDataPoints.length === 0) {
-      throw new Error('Нет точек для оптимизации: все точки являются invariant.');
+      throw new Error('Нет точек для оптимизации.');
     }
     const rawParameters = unwrap(state.parameters);
 
@@ -395,6 +460,9 @@ export async function runRefinement() {
       { type: 'module' },
     );
 
+    activeWorker = worker;
+    lastBestWorkerParams = null;
+
     // Очищаем историю шагов перед запуском
     setState('progressHistory', []);
 
@@ -403,11 +471,17 @@ export async function runRefinement() {
         if (!e.data) return;
 
         if (e.data.type === 'progress') {
+          if (e.data.bestParams) {
+            lastBestWorkerParams = e.data.bestParams;
+          }
+
           setState('progressHistory', h => [
             ...h,
             {
               step: e.data.step,
               maxSteps: e.data.maxSteps,
+              modelEvalCount: e.data.modelEvalCount ?? 0,
+              maxModelEvaluations: e.data.maxModelEvaluations ?? 0,
               rwpVal: e.data.rwpVal,
               chiSq: e.data.chiSq,
               convergenceError: e.data.convergenceError,
@@ -417,15 +491,18 @@ export async function runRefinement() {
         }
 
         if (e.data.success) {
+          activeWorker = null;
           resolve(e.data.result);
           worker.terminate();
         } else {
+          activeWorker = null;
           reject(new Error(e.data.error || 'Неизвестная ошибка воркера'));
           worker.terminate();
         }
       };
 
       worker.onerror = (e: ErrorEvent) => {
+        activeWorker = null;
         console.error('Системная ошибка Воркера (onerror):', e);
 
         const msg = e.message || 'Ошибка загрузки/компиляции скрипта воркера';

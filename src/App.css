@@ -47,6 +47,39 @@ header h1 {
 
 .header-actions { display: flex; gap: 0.5rem; align-items: center; }
 
+/* ── TEMP UNIT TOGGLE ── */
+.temp-unit-toggle {
+  display: flex;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.unit-btn {
+  padding: 3px 10px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.6);
+  border: none;
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 500;
+  transition: background 0.15s, color 0.15s;
+}
+
+.unit-btn:not(:last-child) {
+  border-right: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.unit-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.unit-btn.unit-active {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  font-weight: 600;
+}
+
 .btn-help {
   padding: 4px 14px;
   background: transparent;
@@ -78,6 +111,9 @@ main {
   top: 48px;
   height: calc(100vh - 48px);
   overflow-y: auto;
+  resize: horizontal;
+  min-width: 280px;
+  max-width: 600px;
 }
 
 .left-panel section {
@@ -103,7 +139,7 @@ main {
 }
 
 .pane-diagram { min-height: 500px; }
-.pane-residuals { min-height: 250px; }
+.pane-residuals { min-height: 130px; }
 .pane-gex { min-height: 350px; }
 .pane-report { min-height: auto; }
 
@@ -132,6 +168,9 @@ main {
   top: 48px;
   height: calc(100vh - 48px);
   overflow-y: auto;
+  resize: horizontal;
+  min-width: 320px;
+  max-width: 700px;
 }
 
 .right-panel section {
@@ -356,6 +395,14 @@ select.select-sm {
 }
 
 /* ── PARAMETER PANEL ── */
+.param-group-header td {
+  padding: 8px 4px 4px;
+  font-size: 0.82rem;
+  color: var(--text-main);
+  border-bottom: 2px solid var(--border-color);
+  background: var(--table-header-bg);
+}
+
 .param-minmax {
   display: none;
 }
@@ -445,6 +492,32 @@ select.select-sm {
   text-align: left;
 }
 .help-table th { background: var(--table-header-bg); font-weight: 600; }
+
+.optimization-chart-pane {
+  width: 100%;
+  height: 320px;
+  background: var(--bg-pane);
+  border-radius: 6px;
+  padding: 10px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  margin-top: 15px;
+}
+
+.btn-stop {
+  padding: 8px 24px;
+  background: #e74c3c;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.95rem;
+  transition: background 0.15s;
+}
+
+.btn-stop:hover {
+  background: #c0392b;
+}
 
 /* ── LOADING OVERLAY ── */
 .loading-overlay {
@@ -739,6 +812,113 @@ select.select-sm {
   .file-menu-item:hover {
     background: rgba(52, 152, 219, 0.2);
   }
+}
+
+/* ── DATA INPUT GROUPS ── */
+.data-group {
+  border: 1px solid var(--border-color);
+  border-radius: 5px;
+  margin-bottom: 0.5rem;
+  overflow: hidden;
+}
+
+.data-group-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 5px 8px;
+  background: var(--table-header-bg);
+  border-bottom: 1px solid var(--border-color);
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.data-group-chevron {
+  font-size: 0.7rem;
+  width: 1rem;
+  text-align: center;
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.data-group-label {
+  flex: 1;
+  font-weight: 600;
+  color: var(--text-main);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.data-group-count {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.data-group .data-table {
+  margin: 0;
+}
+
+.data-group .data-table th,
+.data-group .data-table td {
+  padding: 3px 3px;
+  font-size: 0.78rem;
+}
+
+.data-group .data-table thead th {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  font-weight: 500;
+  border-bottom-width: 1px;
+}
+
+.data-group .data-table thead tr:first-child th {
+  padding-top: 5px;
+}
+
+.residual-cell {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  text-align: right;
+  padding-right: 4px !important;
+}
+
+.btn-add-point {
+  width: 100%;
+  padding: 3px 0;
+  font-size: 0.75rem;
+  border-radius: 0 0 4px 4px;
+  background: transparent;
+  color: var(--text-muted);
+  border: none;
+  border-top: 1px dashed var(--border-color);
+  cursor: pointer;
+}
+
+.btn-add-point:hover {
+  background: rgba(52, 152, 219, 0.08);
+  color: #3498db;
+}
+
+.btn-add-point:disabled {
+  cursor: not-allowed;
+  color: var(--text-muted);
+  background: transparent;
+}
+
+.data-add-group {
+  display: flex;
+  gap: 0.4rem;
+  margin-top: 0.5rem;
+  align-items: center;
+}
+
+.data-add-group select {
+  flex: 1;
+  min-width: 0;
 }
 
 

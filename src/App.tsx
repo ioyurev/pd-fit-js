@@ -7,15 +7,15 @@ import { ResidualsPlot } from '@/components/ResidualsPlot';
 import { RefinementControl } from '@/components/RefinementControl';
 import { ReportPanel } from '@/components/ReportPanel';
 import { ToastContainer } from '@/components/ToastContainer';
-import { LLMPanel } from '@/components/LLMPanel';
 import { HelpModal } from '@/components/HelpModal';
 import { ProgressPlot } from '@/components/ProgressPlot';
 import { ConvergencePlot } from '@/components/ConvergencePlot';
 import { GExPlot } from '@/components/GExPlot';
 import { FileMenu } from '@/components/FileMenu';
-import { state } from '@/store/fitStore';
+import { state, stopRefinement } from '@/store/fitStore';
 import { windowTitle, isDirty } from '@/store/fileStore';
 import { hasFileSystemAccess } from '@/lib/projectFile';
+import { tempUnit, setTempUnit } from '@/store/unitsStore';
 import './App.css';
 
 const App: Component = () => {
@@ -89,20 +89,29 @@ const App: Component = () => {
           <div style="display: flex; align-items: center; gap: 1rem;">
             <div class="spinner"></div>
             <div style="font-size: 1.2rem; font-weight: 600;">Выполняется оптимизация...</div>
+            <button class="btn-stop" onClick={stopRefinement}>
+              ◼ Остановить
+            </button>
           </div>
 
           <Show when={state.progressHistory.length > 0}>
             {(() => {
               const last = () => state.progressHistory[state.progressHistory.length - 1];
-              const currentStep = () => last()?.step ?? 0;
-              const maxSteps = () => last()?.maxSteps ?? 500;
-              const pct = () => Math.min(100, (currentStep() / maxSteps()) * 100);
+              const improvementCount = () => last()?.step ?? 0;
+              const maxIterations = () => last()?.maxSteps ?? 120;
+              const modelEvalCount = () => last()?.modelEvalCount ?? 0;
+              const maxModelEvaluations = () => last()?.maxModelEvaluations ?? 0;
+              const pct = () =>
+                maxModelEvaluations() > 0
+                  ? Math.min(100, (modelEvalCount() / maxModelEvaluations()) * 100)
+                  : 0;
 
               return (
                 <div style="width: 90%; max-width: 800px; margin-top: 1rem;">
-                  <div style="display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 4px;">
-                    <span>Успешных шагов: {currentStep()}</span>
-                    <span>Макс. итераций: {maxSteps()}</span>
+                  <div style="display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 4px; gap: 1rem;">
+                    <span>Улучшений модели: {improvementCount()}</span>
+                    <span>Вызовов модели: {modelEvalCount()} / {maxModelEvaluations()}</span>
+                    <span>Лимит итераций LM: {maxIterations()}</span>
                   </div>
                   <div style="width: 100%; height: 8px; background: var(--border-color); border-radius: 4px; overflow: hidden;">
                     <div
@@ -136,6 +145,16 @@ const App: Component = () => {
           <FileMenu />
         </div>
         <div class="header-actions">
+          <div class="temp-unit-toggle">
+            <button
+              class={`unit-btn ${tempUnit() === 'K' ? 'unit-active' : ''}`}
+              onClick={() => setTempUnit('K')}
+            >K</button>
+            <button
+              class={`unit-btn ${tempUnit() === 'C' ? 'unit-active' : ''}`}
+              onClick={() => setTempUnit('C')}
+            >°C</button>
+          </div>
           <button class="btn-help" onClick={() => setHelpOpen(true)}>? Справка</button>
         </div>
       </header>
@@ -144,9 +163,6 @@ const App: Component = () => {
         <div class="left-panel">
           <section class="section-data">
             <DataInput />
-          </section>
-          <section class="section-llm">
-            <LLMPanel />
           </section>
         </div>
 

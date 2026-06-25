@@ -100,9 +100,23 @@ export function runLM(
   let bestRwp = Infinity;
   let prevChiSq = -1;
   let stepCounter = 0;
-  const maxIterations = 500;
+  let modelEvalCount = 0;
+
+  const maxIterations = 120;
+
+  const maxModelEvaluations = 8000;
 
   function model(freePacked: number[]): (index: number) => number {
+    modelEvalCount++;
+
+    if (modelEvalCount > maxModelEvaluations) {
+      throw new Error(
+        `Превышен лимит вычислений модели (${maxModelEvaluations}). ` +
+        `Вероятна сильная корреляция свободных параметров или слишком плоская долина минимума. ` +
+        `Попробуйте зафиксировать один из параметров коррелирующей пары.`
+      );
+    }
+
     const updated = unpackParams(freePacked, paramsFull);
     const { compA, compB, compounds, Lv_H, Lv_S, Lv_H_sol, Lv_S_sol } = paramsToPhysical(updated);
 
@@ -137,13 +151,24 @@ export function runLM(
       prevChiSq = tempChi;
 
       if (typeof self !== 'undefined' && typeof (self as any).postMessage === 'function') {
+        const bestSnapshot = unpackParams(freePacked, paramsFull);
         (self as any).postMessage({
           type: 'progress',
           step: stepCounter,
           maxSteps: maxIterations,
+          modelEvalCount,
+          maxModelEvaluations,
           chiSq: tempChi,
           rwpVal: tempRwp,
           convergenceError: dChiRel,
+          bestParams: bestSnapshot.map(p => ({
+            name: p.name,
+            value: p.value,
+            fixed: p.fixed,
+            min: p.min,
+            max: p.max,
+            boundsEnabled: p.boundsEnabled ?? false,
+          })),
         });
       }
     }
@@ -194,7 +219,7 @@ export function runLM(
       maxValues,
       weights: ws,
       maxIterations,
-      errorTolerance: 1e-4,
+      errorTolerance: 5e-4,
       gradientDifference: adaptiveGradients,
     },
   );

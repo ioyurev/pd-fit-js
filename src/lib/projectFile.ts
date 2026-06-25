@@ -27,6 +27,7 @@ export interface ProjectFile {
   huberBeta?: number;
   compAName: string;
   compBName: string;
+  compoundNames?: Record<string, string>;
   parameters: FitParameter[];
   dataPoints: ProjectDataPoint[];
 }
@@ -39,6 +40,7 @@ export function serializeProject(data: {
   huberBeta?: number;
   compAName: string;
   compBName: string;
+  compoundNames?: Record<string, string>;
   parameters: FitParameter[];
   dataPoints: ProjectDataPoint[];
 }): string {
@@ -49,6 +51,7 @@ export function serializeProject(data: {
     huberBeta: data.huberBeta ?? 10,
     compAName: data.compAName,
     compBName: data.compBName,
+    compoundNames: data.compoundNames ?? {},
     parameters: data.parameters.map(p => ({
       name: p.name,
       value: p.value,
@@ -111,6 +114,7 @@ export function deserializeProject(json: string): ProjectFile {
     huberBeta: migrated.huberBeta ?? 10,
     compAName: migrated.compAName ?? 'A',
     compBName: migrated.compBName ?? 'B',
+    compoundNames: migrated.compoundNames ?? {},
     parameters,
     dataPoints,
   };

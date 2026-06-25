@@ -4,6 +4,8 @@ import { Chart, LineController, LineElement, PointElement, LinearScale, Title, T
 import { Line } from 'solid-chartjs';
 import { state } from '@/store/fitStore';
 import { isDark } from '@/store/themeStore';
+import { tempUnit } from '@/store/unitsStore';
+import { toDisplay, unitLabel } from '@/lib/temperatureUnits';
 import { buildGExDatasets } from '@/lib/gexSeries';
 import { getChartTheme } from '@/lib/chartTheme';
 
@@ -53,13 +55,15 @@ export const GExPlot: Component = () => {
     };
   });
 
-  const T_ref_text = createMemo(() => gexResult().T_ref.toFixed(0));
+  const T_ref_text = createMemo(() =>
+    toDisplay(gexResult().T_ref, tempUnit()).toFixed(0)
+  );
 
   return (
     <div class="residuals-wrap">
       <div class="residuals-header">
         <span class="residuals-title">Избыточная энергия Гиббса (G<sup>ex</sup>)</span>
-        <span class="residuals-hint">при T = {T_ref_text()} K</span>
+        <span class="residuals-hint">при T = {T_ref_text()} {unitLabel(tempUnit())}</span>
       </div>
       <div class="chart-container residual-chart">
         <Line data={chartData()} options={options()} />

@@ -9,6 +9,7 @@ import { encodeBranch } from '@/lib/types';
 import {
   isTransitionParameter,
   getCompoundIds,
+  resolvePhaseDisplayName,
 } from '@/lib/parameterSchema';
 import type { SystemType } from '@/lib/parameterSchema';
 
@@ -22,6 +23,7 @@ export function buildBranchOptions(
   systemType: SystemType,
   compAName: string,
   compBName: string,
+  compoundNames: Record<string, string> = {},
 ): BranchOption[] {
   if (systemType === 'isomorphous') {
     return [
@@ -33,7 +35,7 @@ export function buildBranchOptions(
   const options: BranchOption[] = [
     { value: encodeBranch({ type: 'pure', comp: 'A' }), label: `Ветвь ${compAName}` },
     { value: encodeBranch({ type: 'pure', comp: 'B' }), label: `Ветвь ${compBName}` },
-    { value: encodeBranch({ type: 'invariant', phases: ['A', 'B'] }), label: `Эвтектика ${compAName}–${compBName}` },
+    { value: encodeBranch({ type: 'invariant', phases: ['A', 'B'] }), label: `Инварианта ${compAName}–${compBName}` },
   ];
 
   // Переходы A
@@ -60,19 +62,20 @@ export function buildBranchOptions(
 
   // Соединения
   const compoundIds = getCompoundIds(parameters);
+  const pn = (id: string) => resolvePhaseDisplayName(id, compAName, compBName, compoundNames);
 
   for (const id of compoundIds) {
     options.push({
       value: encodeBranch({ type: 'compound', id }),
-      label: `Ликвидус ${id}`,
+      label: `Ликвидус ${pn(id)}`,
     });
     options.push({
       value: encodeBranch({ type: 'invariant', phases: ['A', id] }),
-      label: `Инв. ${compAName}–${id}`,
+      label: `Инварианта ${compAName}–${pn(id)}`,
     });
     options.push({
       value: encodeBranch({ type: 'invariant', phases: ['B', id] }),
-      label: `Инв. ${compBName}–${id}`,
+      label: `Инварианта ${compBName}–${pn(id)}`,
     });
   }
 
@@ -80,7 +83,7 @@ export function buildBranchOptions(
     for (let j = i + 1; j < compoundIds.length; j++) {
       options.push({
         value: encodeBranch({ type: 'invariant', phases: [compoundIds[i], compoundIds[j]] }),
-        label: `Инв. ${compoundIds[i]}–${compoundIds[j]}`,
+        label: `Инварианта ${pn(compoundIds[i])}–${pn(compoundIds[j])}`,
       });
     }
   }

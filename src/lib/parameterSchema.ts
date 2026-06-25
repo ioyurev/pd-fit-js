@@ -46,6 +46,21 @@ export function getParameterMeta(name: string): ParameterMeta {
   return { label: name, unit: '' };
 }
 
+/**
+ * Укороченный KaTeX-label без суффикса компонента (A, B, C1, 0…).
+ * В групповом отображении компонент ясен из заголовка группы.
+ */
+export function getParameterShortLabel(name: string): string {
+  const { label } = getParameterMeta(name);
+  let short = label;
+  let prev = '';
+  while (prev !== short) {
+    prev = short;
+    short = short.replace(/,\s*([A-Z]\d*|\d+)(?=\})/g, '');
+  }
+  return short;
+}
+
 // ─── Проверки на принадлежность к группе ─────────────────────────────────────
 
 export function isStoichParameter(name: string): boolean {
@@ -246,4 +261,94 @@ export function getCompoundParamNames(id: string): string[] {
 export function currentRKOrder(params: FitParameter[], systemType: SystemType): number {
   if (systemType === 'isomorphous') return countRKTermsLiq(params);
   return countRKTermsEutectic(params);
+}
+
+// ─── Имена соединений и фаз (SSOT) ──────────────────────────────────────────
+
+/** Канонический способ получить отображаемое имя соединения */
+export function getCompoundDisplayName(
+  id: string,
+  compoundNames: Record<string, string>,
+): string {
+  return compoundNames[id] || id;
+}
+
+/**
+ * Универсальный резольвер имени фазы для отображения.
+ * SSOT: все модули, которым нужно display-имя фазы, используют эту функцию.
+ */
+export function resolvePhaseDisplayName(
+  id: string,
+  compAName: string,
+  compBName: string,
+  compoundNames: Record<string, string>,
+): string {
+  if (id === 'A') return compAName;
+  if (id === 'B') return compBName;
+  return getCompoundDisplayName(id, compoundNames);
+}
+
+// ─── Группировка параметров для UI ───────────────────────────────────────────
+
+export interface ParameterGroupEntry {
+  param: FitParameter;
+  index: number;  // индекс в исходном плоском массиве state.parameters
+}
+
+export interface ParameterGroup {
+  id: string;       // 'compA' | 'compB' | 'C1' | 'C2' | 'rk'
+  label: string;
+  entries: ParameterGroupEntry[];
+}
+
+function getParameterGroupId(name: string): string {
+  if (/^(Tfus|dHfus|Ttrans|dHtrans)_A/.test(name)) return 'compA';
+  if (/^(Tfus|dHfus|Ttrans|dHtrans)_B/.test(name)) return 'compB';
+  const m = name.match(/^(?:stoich|Tfus|dHfus)_(C\d+)$/);
+  if (m) return m[1];
+  return 'rk';
+}
+
+export function groupParameters(
+  params: FitParameter[],
+  systemType: SystemType,
+  compAName: string,
+  compBName: string,
+  compoundNames: Record<string, string>,
+): ParameterGroup[] {
+  const map = new Map<string, ParameterGroupEntry[]>();
+
+  params.forEach((param, index) => {
+    const gid = getParameterGroupId(param.name);
+    if (!map.has(gid)) map.set(gid, []);
+    map.get(gid)!.push({ param, index });
+  });
+
+  const groups: ParameterGroup[] = [];
+
+  if (map.has('compA'))
+    groups.push({ id: 'compA', label: `Компонент ${compAName}`, entries: map.get('compA')! });
+  if (map.has('compB'))
+    groups.push({ id: 'compB', label: `Компонент ${compBName}`, entries: map.get('compB')! });
+
+  for (const cid of getCompoundIds(params)) {
+    if (!map.has(cid)) continue;
+    const dn = getCompoundDisplayName(cid, compoundNames);
+    groups.push({
+      id: cid,
+      label: dn !== cid ? `${dn} (${cid})` : `Соединение ${cid}`,
+      entries: map.get(cid)!,
+    });
+  }
+
+  if (map.has('rk'))
+    groups.push({
+      id: 'rk',
+      label: systemType === 'isomorphous'
+        ? 'Взаимодействие (РК, liq+sol)'
+        : 'Взаимодействие (РК)',
+      entries: map.get('rk')!,
+    });
+
+  return groups;
 }

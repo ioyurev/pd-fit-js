@@ -2,6 +2,8 @@ import { createMemo, For } from 'solid-js';
 import type { Component } from 'solid-js';
 import { state } from '@/store/fitStore';
 import { Katex } from '@/components/Katex';
+import { tempUnit } from '@/store/unitsStore';
+import { unitLabel } from '@/lib/temperatureUnits';
 import {
   selectParamErrors,
   formatChiSqWithDelta,
@@ -14,11 +16,32 @@ import {
   exportLiquidusCSV,
   exportLiquidusXLSX,
 } from '@/lib/reportExport';
+import { formatLLMText } from '@/lib/llmExport';
+import { addToast } from '@/store/toastStore';
 
 export const ReportPanel: Component = () => {
   const shareURL = () => {
     navigator.clipboard.writeText(window.location.href);
-    alert('Ссылка скопирована в буфер обмена');
+    addToast('Ссылка скопирована в буфер обмена.', 'success', 3000);
+  };
+
+  const handleCopyLLM = () => {
+    try {
+      const text = formatLLMText(
+        state.dataPoints,
+        state.parameters,
+        state.chiSq,
+        state.rwpVal,
+        state.corrWarnings,
+        tempUnit(),
+        state.residuals,
+      );
+      navigator.clipboard.writeText(text);
+      addToast('Данные скопированы для LLM.', 'success', 3000);
+    } catch (e) {
+      console.error(e);
+      addToast('Ошибка копирования.', 'error', 4000);
+    }
   };
 
   const paramErrors = createMemo(selectParamErrors);
@@ -36,10 +59,11 @@ export const ReportPanel: Component = () => {
 
   const exportLiquidus = (format: 'csv' | 'xlsx') => {
     const rows = getLiquidusTableData();
+    const unit = tempUnit();
     if (format === 'csv') {
-      exportLiquidusCSV(rows);
+      exportLiquidusCSV(rows, unit);
     } else {
-      exportLiquidusXLSX(rows);
+      exportLiquidusXLSX(rows, unit);
     }
   };
 
@@ -57,7 +81,7 @@ export const ReportPanel: Component = () => {
         </div>
         <div class="stat-item" style="flex-direction: column; align-items: flex-start; gap: 0; margin-top: 0.4rem;">
           <span class="stat-label">RMSE</span>
-          <span class="stat-value" style="font-size: 0.85rem; white-space: nowrap;">{state.rmseVal.toFixed(3)} K</span>
+          <span class="stat-value" style="font-size: 0.85rem; white-space: nowrap;">{state.rmseVal.toFixed(3)} {unitLabel(tempUnit())}</span>
         </div>
         <div class="stat-item" style="flex-direction: column; align-items: flex-start; gap: 0; margin-top: 0.4rem;">
           <span class="stat-label">R²</span>
@@ -141,9 +165,14 @@ export const ReportPanel: Component = () => {
             Liq XLSX
           </button>
         </div>
-        <button onClick={shareURL} class="btn-share-sm" disabled={state.isRunning}>
-          🔗 URL
-        </button>
+        <div style="display: flex; gap: 4px;">
+          <button onClick={shareURL} class="btn-share-sm" style="flex: 1;" disabled={state.isRunning}>
+            🔗 URL
+          </button>
+          <button onClick={handleCopyLLM} class="btn-export" style="flex: 1; background: #8e44ad;" disabled={state.isRunning}>
+            📋 LLM
+          </button>
+        </div>
       </div>
     </div>
   );

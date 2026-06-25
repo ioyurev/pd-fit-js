@@ -6,6 +6,8 @@
 import { utils, writeFile } from 'xlsx';
 import type { FitParameter } from '@/lib/fitAdapter';
 import type { LiquidusRow } from '@/store/fitSelectors';
+import type { TempUnit } from '@/lib/temperatureUnits';
+import { toDisplay, unitLabel } from '@/lib/temperatureUnits';
 
 function downloadCSV(filename: string, content: string) {
   const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
@@ -61,18 +63,24 @@ export function exportParamsXLSX(
   writeFile(wb, 'parameters.xlsx');
 }
 
-export function exportLiquidusCSV(rows: LiquidusRow[]) {
+export function exportLiquidusCSV(
+  rows: LiquidusRow[],
+  unit: TempUnit = 'K',
+) {
   const lines = [
-    'xB,T_liquidus (K),Stable phase',
-    ...rows.map(r => `${r.xB.toFixed(4)},${r.T_liq.toFixed(4)},${r.phaseId}`),
+    `xB,T_liquidus (${unitLabel(unit)}),Stable phase`,
+    ...rows.map(r => `${r.xB.toFixed(4)},${toDisplay(r.T_liq, unit).toFixed(4)},${r.phaseId}`),
   ];
   downloadCSV('liquidus.csv', lines.join('\r\n'));
 }
 
-export function exportLiquidusXLSX(rows: LiquidusRow[]) {
+export function exportLiquidusXLSX(
+  rows: LiquidusRow[],
+  unit: TempUnit = 'K',
+) {
   const data = rows.map(r => ({
     xB: r.xB,
-    'T_liquidus (K)': r.T_liq,
+    [`T_liquidus (${unitLabel(unit)})`]: toDisplay(r.T_liq, unit),
     'Stable phase': r.phaseId,
   }));
   const ws = utils.json_to_sheet(data);

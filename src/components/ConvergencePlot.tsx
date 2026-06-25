@@ -63,7 +63,7 @@ export const ConvergencePlot: Component = () => {
       },
       scales: {
         x: {
-          title: { display: true, text: 'Успешный шаг', color: textColor },
+          title: { display: true, text: 'Улучшение модели', color: textColor },
           grid: { display: false }, ticks: { color: textColor }
         },
         y: {
@@ -79,7 +79,7 @@ export const ConvergencePlot: Component = () => {
   });
 
   return (
-    <div style="width: 100%; height: 220px; background: var(--bg-pane); border-radius: 6px; padding: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); margin-top: 15px;">
+    <div class="optimization-chart-pane">
       <Line data={chartData()} options={options()} />
     </div>
   );

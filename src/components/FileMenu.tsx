@@ -67,6 +67,7 @@ export const FileMenu: Component = () => {
       huberBeta: state.huberBeta,
       compAName: state.compAName,
       compBName: state.compBName,
+      compoundNames: unwrap(state.compoundNames),
       parameters: unwrap(state.parameters),
       dataPoints: unwrap(state.dataPoints),
     });
@@ -104,6 +105,7 @@ export const FileMenu: Component = () => {
         huberBeta: project.huberBeta,
         compAName: project.compAName,
         compBName: project.compBName,
+        compoundNames: project.compoundNames,
         parameters: project.parameters,
         dataPoints: project.dataPoints,
       });

@@ -5,13 +5,19 @@
 
 import type { FitParameter } from '@/lib/fitAdapter';
 import { paramsToPhysical } from '@/lib/fitAdapter';
-import { buildGlobalLiquidusProfile, findInvariantPoint } from '@/lib/liquidusSolver';
+import {
+  buildGlobalLiquidusProfile,
+  determineInvariantType,
+  getInvariantDisplaySpan,
+  getPhaseCompositionX,
+  evaluatePhaseLiquidusT,
+  findInvariantPointDetailed,
+} from '@/lib/liquidusSolver';
 import type { LiquidusProfilePoint } from '@/lib/liquidusSolver';
 import { buildIsomorphousProfile } from '@/lib/isomorphousSolver';
-import { encodeBranch } from '@/lib/types';
 import type { BranchDef } from '@/lib/types';
 import { phaseColor } from '@/lib/chartTheme';
-import { getCompoundIds } from '@/lib/parameterSchema';
+import { getCompoundIds, resolvePhaseDisplayName } from '@/lib/parameterSchema';
 
 interface DataPoint {
   xB: number;
@@ -76,12 +82,104 @@ function findTransitionIntersection(
   return null;
 }
 
+const PROFILE_STEPS_DIAGRAM = 2000;
+const FULL_BRANCH_STEPS = 200;
+
+function interpolateProfileTemperature(
+  profile: LiquidusProfilePoint[],
+  xTarget: number,
+): number {
+  if (profile.length === 0) return NaN;
+
+  if (xTarget <= profile[0].xB) return profile[0].T;
+  if (xTarget >= profile[profile.length - 1].xB) return profile[profile.length - 1].T;
+
+  for (let i = 0; i < profile.length - 1; i++) {
+    const left = profile[i];
+    const right = profile[i + 1];
+
+    if (xTarget < left.xB || xTarget > right.xB) continue;
+    if (!Number.isFinite(left.T) || !Number.isFinite(right.T)) return NaN;
+
+    const dx = right.xB - left.xB;
+    if (Math.abs(dx) < 1e-12) {
+      return Math.max(left.T, right.T);
+    }
+
+    const t = (xTarget - left.xB) / dx;
+    return left.T + t * (right.T - left.T);
+  }
+
+  return NaN;
+}
+
+function segmentSpansX(
+  seg: { pts: { x: number; y: number }[] },
+  x: number,
+  tol = 1e-6,
+): boolean {
+  const firstX = seg.pts[0]?.x;
+  const lastX = seg.pts[seg.pts.length - 1]?.x;
+
+  if (!Number.isFinite(firstX) || !Number.isFinite(lastX)) return false;
+
+  const minX = Math.min(firstX, lastX);
+  const maxX = Math.max(firstX, lastX);
+
+  return x >= minX - tol && x <= maxX + tol;
+}
+
+function buildOrderedSolidPhaseIds(
+  compounds: Array<{ id: string; stoichB: number }>,
+): string[] {
+  const orderedCompounds = [...compounds]
+    .sort((a, b) => a.stoichB - b.stoichB)
+    .map(c => c.id);
+
+  return ['A', ...orderedCompounds, 'B'];
+}
+
+function getNeighborPhaseIds(
+  phaseId: string,
+  orderedPhaseIds: string[],
+): string[] {
+  const idx = orderedPhaseIds.indexOf(phaseId);
+  if (idx < 0) return [];
+
+  const neighbors: string[] = [];
+  if (idx > 0) neighbors.push(orderedPhaseIds[idx - 1]);
+  if (idx < orderedPhaseIds.length - 1) neighbors.push(orderedPhaseIds[idx + 1]);
+
+  return neighbors;
+}
+
+function deriveVisibleTemperatureFloor(
+  profile: LiquidusProfilePoint[],
+  dataPoints: DataPoint[],
+): number {
+  const temps = [
+    ...profile.map(p => p.T),
+    ...dataPoints.map(p => p.T),
+  ].filter((t): t is number => Number.isFinite(t) && t > 0);
+
+  if (temps.length === 0) return 0;
+
+  const minT = Math.min(...temps);
+  const maxT = Math.max(...temps);
+  const range = Math.max(1, maxT - minT);
+
+  const pad = Math.min(120, Math.max(20, range * 0.08));
+
+  return Math.max(0, minT - pad);
+}
+
 export function buildDiagramDatasets(
   dataPoints: DataPoint[],
   parameters: FitParameter[],
   systemType: 'eutectic' | 'isomorphous',
   compAName: string,
   compBName: string,
+  compoundNames: Record<string, string> = {},
 ) {
   const { compA, compB, compounds, Lv_H, Lv_S, Lv_H_sol, Lv_S_sol } = paramsToPhysical(parameters);
   const compoundIds = getCompoundIds(parameters);
@@ -126,7 +224,14 @@ export function buildDiagramDatasets(
   }
 
   // ── Эвтектика ──
-  const profile = buildGlobalLiquidusProfile(compA, compB, compounds, Lv_H, Lv_S, 500);
+  const profile = buildGlobalLiquidusProfile(
+    compA,
+    compB,
+    compounds,
+    Lv_H,
+    Lv_S,
+    PROFILE_STEPS_DIAGRAM,
+  );
 
   type Segment = { phaseId: string; pts: { x: number; y: number }[] };
   const segments: Segment[] = [];
@@ -144,88 +249,244 @@ export function buildDiagramDatasets(
     }
   }
 
-  const phaseLabel = (id: string) => {
-    if (id === 'A') return compAName;
-    if (id === 'B') return compBName;
-    return id;
-  };
+  const visibleTempFloor = deriveVisibleTemperatureFloor(profile, dataPoints);
+
+  const phaseLabel = (id: string) =>
+    resolvePhaseDisplayName(id, compAName, compBName, compoundNames);
+
+  // ── Полные ветви каждой фазы (пунктирные, на всём [0, 1]) ──
+  const allPhaseIds = ['A', 'B', ...compoundIds];
+
+  const fullBranchDatasets = allPhaseIds
+    .map(phaseId => {
+      const pts: { x: number; y: number }[] = [];
+
+      for (let i = 1; i < FULL_BRANCH_STEPS; i++) {
+        const xB = i / FULL_BRANCH_STEPS;
+        const T = evaluatePhaseLiquidusT(
+          xB, phaseId, compA, compB, compounds, Lv_H, Lv_S,
+        );
+        if (Number.isFinite(T) && T > 0) {
+          pts.push({ x: xB, y: T });
+        }
+      }
+
+      return {
+        label: `${phaseLabel(phaseId)} (метастаб.)`,
+        data: pts,
+        borderColor: phaseColor(phaseId, compoundIds, 0.3),
+        borderWidth: 1.5,
+        borderDash: [6, 4],
+        pointRadius: 0,
+        fill: false,
+        type: 'line' as const,
+        pdLegend: false,
+      };
+    })
+    .filter(ds => ds.data.length > 1);
 
   const liquidusDatasets = segments.map(seg => ({
-    label: `Ликвидус ${phaseLabel(seg.phaseId)}`,
+    label: `Liq ${phaseLabel(seg.phaseId)}`,
     data: seg.pts,
     borderColor: phaseColor(seg.phaseId, compoundIds),
-    borderWidth: 2, pointRadius: 0, fill: false, type: 'line' as const,
+    borderWidth: 2,
+    pointRadius: 0,
+    fill: false,
+    type: 'line' as const,
   }));
 
-  const expPoints = dataPoints.map(p => ({ x: p.xB, y: p.T }));
-
   const invariantDatasets: any[] = [];
-  const seenInv = new Set<string>();
+  const seenInvariantKeys = new Set<string>();
+  const validInvariants: Array<{ phases: [string, string]; T: number }> = [];
 
-  for (const p of dataPoints) {
-    if (p.branch.type !== 'invariant') continue;
-    const key = encodeBranch(p.branch);
-    if (seenInv.has(key)) continue;
-    seenInv.add(key);
+  for (let i = 0; i < segments.length - 1; i++) {
+    const left = segments[i];
+    const right = segments[i + 1];
 
-    const inv = findInvariantPoint(p.branch.phases, compA, compB, compounds, Lv_H, Lv_S);
-    if (!isFinite(inv.T)) continue;
+    const breakPoint =
+      right.pts[0] ??
+      left.pts[left.pts.length - 1];
 
-    const phaseXs = p.branch.phases.map(id => {
-      if (id === 'A') return 0;
-      if (id === 'B') return 1;
-      return compounds.find(c => c.id === id)?.stoichB ?? inv.xB;
+    if (!breakPoint || !Number.isFinite(breakPoint.x) || !Number.isFinite(breakPoint.y)) {
+      continue;
+    }
+
+    const key = `${left.phaseId}|${right.phaseId}|${breakPoint.x.toFixed(4)}|${breakPoint.y.toFixed(3)}`;
+    if (seenInvariantKeys.has(key)) continue;
+    seenInvariantKeys.add(key);
+
+    const phases: [string, string] = [left.phaseId, right.phaseId];
+
+    validInvariants.push({
+      phases,
+      T: breakPoint.y,
     });
-    const xLeft  = Math.min(...phaseXs);
-    const xRight = Math.max(...phaseXs);
+
+    const invType = determineInvariantType(
+      breakPoint.x,
+      phases,
+      compounds,
+    );
+    const labelPrefix = invType === 'peritectic' ? 'Перитектика' : 'Эвтектика';
+    const { xLeft, xRight } = getInvariantDisplaySpan(
+      breakPoint.x,
+      phases,
+      compounds,
+    );
 
     invariantDatasets.push({
-      label: `Инв. ${p.branch.phases.join('–')} (${inv.T.toFixed(1)} K)`,
-      data: [{ x: xLeft, y: inv.T }, { x: xRight, y: inv.T }],
-      borderColor: 'rgba(231, 76, 60, 0.7)', borderWidth: 1.5,
-      borderDash: [5, 4], pointRadius: 0, fill: false, type: 'line' as const,
+      label: `${labelPrefix} ${phaseLabel(left.phaseId)}–${phaseLabel(right.phaseId)}`,
+      data: [{ x: xLeft, y: breakPoint.y }, { x: xRight, y: breakPoint.y }],
+      borderColor:
+        invType === 'peritectic'
+          ? 'rgba(230, 126, 34, 0.8)'
+          : 'rgba(231, 76, 60, 0.7)',
+      borderWidth: 1.5,
+      borderDash: [],
+      pointRadius: 0,
+      fill: false,
+      type: 'line' as const,
+      pdLegend: false,
+    });
+  }
+
+  const orderedSolidPhaseIds = buildOrderedSolidPhaseIds(compounds);
+
+  const exactPairInvariantTopByCompound = new Map<string, number>();
+
+  for (const c of compounds) {
+    const neighborIds = getNeighborPhaseIds(c.id, orderedSolidPhaseIds);
+
+    const exactTemps = neighborIds
+      .map(neighborId =>
+        findInvariantPointDetailed(
+          [c.id, neighborId],
+          compA,
+          compB,
+          compounds,
+          Lv_H,
+          Lv_S,
+        ),
+      )
+      .filter(inv => inv.kind === 'intersection' && Number.isFinite(inv.T) && inv.T > 0)
+      .map(inv => inv.T);
+
+    if (exactTemps.length > 0) {
+      exactPairInvariantTopByCompound.set(c.id, Math.max(...exactTemps));
+    }
+  }
+
+  const compoundDatasets: any[] = [];
+
+  for (const c of compounds) {
+    const x = getPhaseCompositionX(c.id, compounds, c.stoichB);
+
+    const ownSegments = segments.filter(seg => seg.phaseId === c.id);
+    const isCongruent = ownSegments.some(seg => segmentSpansX(seg, x));
+
+    let topT = NaN;
+
+    if (isCongruent) {
+      topT = interpolateProfileTemperature(profile, x);
+    } else {
+      topT = exactPairInvariantTopByCompound.get(c.id) ?? NaN;
+    }
+
+    if (!Number.isFinite(topT) || topT <= visibleTempFloor) {
+      continue;
+    }
+
+    compoundDatasets.push({
+      label: `Стехиометрия ${phaseLabel(c.id)}`,
+      data: [{ x, y: visibleTempFloor }, { x, y: topT }],
+      borderColor: phaseColor(c.id, compoundIds, 0.8),
+      borderWidth: 1.5,
+      borderDash: [],
+      pointRadius: 0,
+      fill: false,
+      type: 'line' as const,
+      pdLegend: false,
     });
   }
 
   const transitionDatasets: any[] = [];
 
-  for (const trans of compA.transitions) {
+  for (const [idx, trans] of compA.transitions.entries()) {
     if (trans.T <= 0) continue;
 
     const xIntersect = findTransitionIntersection(profile, 'A', trans.T, false);
     const xEnd = xIntersect ?? 0.5;
 
     transitionDatasets.push({
-      label: `Переход ${compAName} (${trans.T.toFixed(0)} K)`,
+      label: `Переход ${compAName} (${idx + 1})`,
       data: [{ x: 0, y: trans.T }, { x: xEnd, y: trans.T }],
       borderColor: 'rgba(54, 162, 235, 0.5)', borderWidth: 1.5,
       borderDash: [5, 3], pointRadius: 0, fill: false, type: 'line' as const,
+      pdLegend: false,
     });
   }
 
-  for (const trans of compB.transitions) {
+  for (const [idx, trans] of compB.transitions.entries()) {
     if (trans.T <= 0) continue;
 
     const xIntersect = findTransitionIntersection(profile, 'B', trans.T, true);
     const xStart = xIntersect ?? 0.5;
 
     transitionDatasets.push({
-      label: `Переход ${compBName} (${trans.T.toFixed(0)} K)`,
+      label: `Переход ${compBName} (${idx + 1})`,
       data: [{ x: xStart, y: trans.T }, { x: 1, y: trans.T }],
       borderColor: 'rgba(75, 192, 192, 0.5)', borderWidth: 1.5,
       borderDash: [5, 3], pointRadius: 0, fill: false, type: 'line' as const,
+      pdLegend: false,
     });
   }
 
+  const expPointsLiq = dataPoints
+    .filter(p => p.branch.type !== 'invariant')
+    .map(p => ({ x: p.xB, y: p.T }));
+
+  const expPointsInv = dataPoints
+    .filter(p => p.branch.type === 'invariant')
+    .map(p => ({ x: p.xB, y: p.T }));
+
+  // yMin: 10% ниже диапазона стабильного ликвидуса + эксперимента
+  const stableTemps = [
+    ...profile.filter(p => Number.isFinite(p.T) && p.T > 0).map(p => p.T),
+    ...dataPoints.map(p => p.T),
+  ].filter(Number.isFinite);
+
+  let yMin: number | undefined;
+  if (stableTemps.length > 0) {
+    const minT = Math.min(...stableTemps);
+    const maxT = Math.max(...stableTemps);
+    const range = Math.max(1, maxT - minT);
+    yMin = Math.max(0, minT - range * 0.1);
+  }
+
   return {
+    yMin,
     datasets: [
-      {
-        label: 'Эксперимент', data: expPoints,
-        backgroundColor: 'rgba(255, 99, 132, 1)', type: 'scatter' as const, order: 0,
-      },
+      ...fullBranchDatasets,
+      ...compoundDatasets,
       ...liquidusDatasets,
       ...invariantDatasets,
       ...transitionDatasets,
+      {
+        label: 'Эксперимент (Ликвидус)',
+        data: expPointsLiq,
+        backgroundColor: 'rgba(255, 99, 132, 1)',
+        type: 'scatter' as const,
+        order: 0,
+      },
+      {
+        label: 'Эксперимент (Инварианты)',
+        data: expPointsInv,
+        backgroundColor: 'rgba(46, 204, 113, 1)',
+        pointStyle: 'rectRot',
+        pointRadius: 6,
+        type: 'scatter' as const,
+        order: 0,
+      },
     ],
   };
 }
